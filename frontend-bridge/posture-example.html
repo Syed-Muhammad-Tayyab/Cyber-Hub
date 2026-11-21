@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<!-- Cyber Hub - Windows security posture example (Part 11) | Developed by Syed Muhammad Tayyab
+     Copy this file + cyberhub-api.js (+ auth-example.html) into ../ui/, start the engine
+     (start_cyberhub_admin.bat so fixes to machine-wide settings work), sign in at
+     /auth-example.html, then open http://127.0.0.1:8765/posture-example.html -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cyber Hub · Security posture</title>
+<style>
+  :root{--bg:#0b1220;--card:rgba(30,58,138,.22);--line:rgba(96,165,250,.22);--txt:#e2e8f0;--mut:#94a3b8;--acc:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--crit:#dc2626;--c:#38bdf8}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 "Segoe UI",system-ui,sans-serif}
+  header,footer{padding:12px 24px;color:#93c5fd;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+  footer{color:var(--mut);justify-content:center} a{color:#93c5fd}
+  h1{margin:0;font-size:20px;color:var(--txt)} h2{margin:0 0 12px;font-size:14px;color:#bfdbfe;font-weight:600}
+  main{padding:0 24px 12px;display:grid;gap:16px;grid-template-columns:repeat(12,1fr)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;backdrop-filter:blur(10px)}
+  .s12{grid-column:span 12}.s8{grid-column:span 8}.s7{grid-column:span 7}.s6{grid-column:span 6}.s5{grid-column:span 5}.s4{grid-column:span 4}
+  @media(max-width:1100px){.s8,.s7,.s6,.s5,.s4{grid-column:span 12}}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center} .sp{justify-content:space-between}
+  button,input,select{font:inherit;color:var(--txt);background:#0f172a;border:1px solid #334155;border-radius:8px;padding:5px 10px}
+  button{cursor:pointer;background:#1e3a8a;border-color:#1e40af} button.ghost{background:transparent;border-color:#334155}
+  button.danger{background:#7f1d1d;border-color:#991b1b} button:disabled{opacity:.45;cursor:not-allowed}
+  table{width:100%;border-collapse:collapse;font-size:13px} td,th{padding:6px 4px;text-align:left;border-bottom:1px solid #1e293b;vertical-align:top}
+  th{color:var(--mut);font-weight:500}
+  .pill{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap}
+  .pass,.ok,.applied{background:#14532d;color:#86efac}.high,.critical,.fail,.failed{background:#7f1d1d;color:#fca5a5}
+  .medium,.not_applied{background:#78350f;color:#fcd34d}.low{background:#1e3a5f;color:#93c5fd}
+  .info,.unknown,.reverted,.ignored{background:#334155;color:#cbd5e1}
+  .mut{color:var(--mut)} .mono{font-family:Consolas,monospace;font-size:12px;word-break:break-all}
+  .ring{width:150px;height:150px;flex:none} .mini{width:54px;height:54px;flex:none}
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px} @media(max-width:800px){.tiles{grid-template-columns:1fr 1fr}}
+  .tile{border:1px solid var(--line);border-radius:14px;padding:10px;background:rgba(15,23,42,.45);display:flex;gap:10px;align-items:center;cursor:pointer}
+  .tile.sel{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset} .tile b{display:block;font-size:13px} .tile span{font-size:12px;color:var(--mut)}
+  .issue{border-bottom:1px solid #1e293b;padding:9px 0} .issue .top{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center}
+  .issue details{margin:6px 0 0 4px;font-size:13px;color:#cbd5e1} .issue summary{cursor:pointer;color:var(--mut);font-size:12px}
+  .issue ol{margin:6px 0;padding-left:20px}
+  .bars{display:flex;align-items:flex-end;gap:3px;height:110px} .bars i{flex:1;display:block;border-radius:3px 3px 0 0;min-height:2px}
+  .warnbox{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);border-radius:10px;padding:8px 10px;font-size:12px;color:#fde68a;margin-top:8px}
+  .scroll{max-height:380px;overflow:auto} #gate{text-align:center;padding:60px}
+  #toast{position:fixed;right:20px;bottom:20px;background:#1e3a8a;border:1px solid #3b82f6;padding:12px 16px;border-radius:12px;display:none;max-width:460px;z-index:6}
+  #toast.bad{background:#450a0a;border-color:#ef4444}
+</style>
+</head>
+<body>
+<header><h1>🛡️ Cyber Hub · Security posture</h1>
+  <span>Developed by Syed Muhammad Tayyab · <a href="firewall-example.html">Firewall</a> · <a href="network-example.html">Network</a> · <a href="scanner-example.html">Scanner</a></span></header>
+<div id="gate" style="display:none">Sign in first at <a href="auth-example.html">auth-example.html</a>, then come back.</div>
+
+<main id="app" style="display:none">
+  <section class="card s5">
+    <div class="row sp"><h2 style="margin:0">Overall</h2><span id="grade"></span></div>
+    <div class="row" style="margin-top:8px;gap:16px">
+      <svg class="ring" viewBox="0 0 120 120" id="ring"></svg>
+      <div><div id="osline" class="mut"></div>
+        <div style="margin-top:8px" id="totals"></div>
+        <div class="row" style="margin-top:12px">
+          <button onclick="fixAll()">Fix all safe issues</button>
+          <button class="ghost" onclick="act(CyberHub.postureWatchNow(), 'Checked again')">Check again</button></div></div>
+    </div>
+    <div id="elev" class="warnbox" style="display:none"></div>
+    <div id="reboot" class="warnbox" style="display:none"></div>
+  </section>
+
+  <section class="card s7">
+    <h2>Sections <span class="mut" style="font-weight:400">· click to filter</span></h2>
+    <div class="tiles" id="tiles"></div>
+  </section>
+
+  <section class="card s8">
+    <div class="row sp"><h2 style="margin:0" id="listTitle">Issues</h2>
+      <span class="row"><label class="mut"><input type="checkbox" id="showPass" onchange="renderChecks()"> show passing</label></span></div>
+    <div class="scroll" id="issues" style="margin-top:6px;max-height:620px"></div>
+  </section>
+
+  <section class="card s4">
+    <h2>Score history (30 days)</h2>
+    <div class="bars" id="hist"></div><div class="row sp mut" style="font-size:11px"><span id="h0"></span><span>today</span></div>
+    <h2 style="margin-top:16px">Alerts <span class="mut" id="unack"></span></h2>
+    <div class="scroll" id="events" style="max-height:250px"></div>
+    <div class="row" style="margin-top:6px"><button class="ghost" onclick="act(CyberHub.ackPostureEvents(), 'Marked as read')">Mark all read</button></div>
+  </section>
+
+  <section class="card s6">
+    <div class="row sp"><h2 style="margin:0">Microsoft Defender</h2>
+      <span class="row"><button class="ghost" onclick="act(CyberHub.updateDefender(), 'Definition update requested')">Update definitions</button>
+        <button class="ghost" onclick="act(CyberHub.defenderScan('quick'), 'Defender quick scan started')">Quick scan</button></span></div>
+    <div id="def" style="margin-top:8px"></div>
+  </section>
+
+  <section class="card s6">
+    <div class="row sp"><h2 style="margin:0">Windows Update</h2>
+      <span class="row"><button class="ghost" onclick="searchUpdates()">Search for missing updates</button>
+        <button class="ghost" onclick="act(CyberHub.openWindowsSettings('windows_update'), 'Opened Windows Update')">Open Windows Update</button></span></div>
+    <div id="wu" style="margin-top:8px"></div>
+  </section>
+
+  <section class="card s12">
+    <h2>Changes made by Cyber Hub</h2>
+    <div class="scroll" id="changes" style="max-height:260px"></div>
+  </section>
+</main>
+<footer>Cyber Hub · Part 11 · Windows Security Posture — Developed by Syed Muhammad Tayyab</footer>
+<div id="toast"></div>
+
+<script src="cyberhub-api.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pill = (t, cls) => `<span class="pill ${esc(cls || t)}">${esc(t)}</span>`;
+const SEVC = {critical:"#dc2626",high:"#ef4444",medium:"#f59e0b",low:"#38bdf8",info:"#64748b"};
+let ALL = null, CAT = null, ME = null;
+
+function toast(msg, bad) { const t = $("#toast"); t.textContent = msg; t.className = bad ? "bad" : ""; t.style.display = "block";
+  clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 5000); }
+async function act(p, ok) { try { const r = await p; toast(ok); await load(); return r; } catch (e) { toast(e.message, true); } }
+
+function ring(el, score, size = 120, w = 12) {
+  const r = (size - w) / 2, C = 2 * Math.PI * r, col = score >= 90 ? "#22c55e" : score >= 70 ? "#38bdf8" : score >= 50 ? "#f59e0b" : "#ef4444";
+  el.setAttribute("viewBox", `0 0 ${size} ${size}`);
+  el.innerHTML = `<circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="#1e293b" stroke-width="${w}"/>
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round"
+      stroke-dasharray="${C * (score ?? 0) / 100} ${C}" transform="rotate(-90 ${size/2} ${size/2})"/>
+    <text x="50%" y="${size > 80 ? 52 : 55}%" text-anchor="middle" dominant-baseline="middle" fill="#e2e8f0"
+      font-size="${size > 80 ? 30 : 15}" font-weight="700">${score ?? "–"}</text>` + (size > 80 ?
+    `<text x="50%" y="68%" text-anchor="middle" fill="#94a3b8" font-size="10">of 100</text>` : "");
+}
+
+async function load() {
+  try { ME = ME || (await CyberHub.me()).user; } catch (e) { $("#gate").style.display = "block"; return; }
+  $("#app").style.display = "grid";
+  const [st, all, sum, evs, ch] = await Promise.all([CyberHub.postureStatus(), CyberHub.postureChecks(),
+    CyberHub.postureSummary(30), CyberHub.postureEvents({ limit: 30 }), CyberHub.postureChanges(30)]);
+  ALL = all;
+  if (st.error) { $("#osline").textContent = st.error; return; }
+  ring($("#ring"), st.score);
+  $("#grade").innerHTML = pill(st.grade, st.score >= 90 ? "pass" : st.score >= 70 ? "low" : st.score >= 50 ? "medium" : "high");
+  const os = st.os || {};
+  $("#osline").innerHTML = `${esc(os.name)} ${esc(os.display_version || "")} · build ${esc(os.build)}${os.portable ? " · laptop" : ""}`;
+  const t = st.totals;
+  $("#totals").innerHTML = `${pill(t.passed + " passing", "pass")} ${pill(t.failed + " to fix", t.failed ? "high" : "pass")}
+    ${t.unknown ? pill(t.unknown + " unknown", "unknown") : ""} ${t.ignored ? pill(t.ignored + " ignored", "ignored") : ""}
+    <div class="mut" style="margin-top:6px">${t.fixable} can be fixed with one click</div>`;
+  $("#elev").style.display = st.elevated ? "none" : "block";
+  $("#elev").textContent = "Cyber Hub is running without administrator rights: it can check everything, but fixes to " +
+    "machine-wide settings need start_cyberhub_admin.bat.";
+  const rb = st.pending_reboot || st.changes_pending_reboot;
+  $("#reboot").style.display = rb ? "block" : "none";
+  $("#reboot").textContent = "Restart the PC to finish " + (st.changes_pending_reboot ? st.changes_pending_reboot + " Cyber Hub fix(es)" : "") +
+    (st.changes_pending_reboot && st.pending_reboot ? " and " : "") + (st.pending_reboot ? "installed Windows updates" : "") + ".";
+  $("#tiles").innerHTML = st.categories.map(c => `<div class="tile ${CAT === c.id ? "sel" : ""}" onclick="pick('${c.id}')">
+    <svg class="mini" id="m_${c.id}"></svg><div><b>${esc(c.name)}</b>
+    <span>${c.failed ? `<span style="color:${SEVC[c.worst] || "#f59e0b"}">${c.failed} to fix</span>` : "All good"} · ${c.passed}/${c.total} pass</span></div></div>`).join("");
+  st.categories.forEach(c => ring($("#m_" + c.id), c.score, 54, 6));
+  renderChecks();
+  const days = sum.per_day;
+  $("#h0").textContent = days[0].day.slice(5);
+  $("#hist").innerHTML = days.map(d => `<i title="${d.day}: ${d.score ?? "no data"}" style="height:${d.score ?? 0}%;background:${
+    d.score == null ? "#1e293b" : d.score >= 90 ? "#22c55e" : d.score >= 70 ? "#38bdf8" : d.score >= 50 ? "#f59e0b" : "#ef4444"}"></i>`).join("");
+  $("#unack").textContent = evs.unacknowledged ? `· ${evs.unacknowledged} unread` : "";
+  $("#events").innerHTML = evs.items.length ? `<table>${evs.items.map(e => `<tr><td>${pill(e.severity)}</td>
+    <td>${esc(e.title)}<div class="mut" style="font-size:12px">${esc((e.detail || "").slice(0, 140))}</div></td>
+    <td class="mut" style="font-size:11px;white-space:nowrap">${new Date(e.ts).toLocaleString()}</td></tr>`).join("")}</table>`
+    : `<div class="mut">No alerts yet.</div>`;
+  $("#changes").innerHTML = ch.items.length ? `<table><tr><th>When</th><th>Fix</th><th>By</th><th>Status</th><th></th></tr>${ch.items.map(x =>
+    `<tr><td class="mut">${new Date(x.ts).toLocaleString()}</td><td><b>${esc(x.title)}</b> — ${esc(x.label)}${x.reboot_required ? " · restart" : ""}
+      ${x.message ? `<div class="mut" style="font-size:12px">${esc(x.message)}</div>` : ""}</td><td>${esc(x.username)}</td>
+      <td>${pill(x.status)}</td><td>${x.reversible && ME.role === "admin" ? `<button class="ghost" onclick="undo(${x.id})">Undo</button>` : ""}</td></tr>`).join("")}</table>`
+    : `<div class="mut">Nothing changed yet.</div>`;
+  loadDefender(); loadUpdates();
+}
+
+function pick(id) { CAT = CAT === id ? null : id; load(); }
+
+function renderChecks() {
+  if (!ALL) return;
+  const showPass = $("#showPass").checked;
+  let list = ALL.checks.filter(c => !CAT || c.category === CAT);
+  if (!showPass) list = list.filter(c => c.status !== "pass");
+  $("#listTitle").textContent = (CAT ? ALL.categories.find(c => c.id === CAT).name : "All sections") + ` · ${list.length}`;
+  $("#issues").innerHTML = list.map(c => {
+    const f = c.fix, m = c.manual, admin = ME.role === "admin";
+    const status = c.ignored ? pill("ignored") : c.status === "fail" ? pill(c.severity === "info" ? "tip" : c.severity, c.severity) : pill(c.status);
+    const btn = c.status !== "fail" || c.ignored ? (c.ignored ? `<button class="ghost" onclick="unignore('${c.id}')">Watch again</button>` : "")
+      : f ? `<button ${f.blocked || (f.admin && !admin) ? "disabled" : ""} title="${esc(f.blocked || (f.admin && !admin ? "Administrator only" : ""))}"
+          onclick="fix('${c.id}')">${esc(f.label)}</button>`
+      : m && m.open ? `<button class="ghost" onclick="act(CyberHub.openWindowsSettings('${m.open}'), 'Opened in Windows')">Open settings</button>` : "";
+    return `<div class="issue"><div class="top">${status}<div><b>${esc(c.title)}</b> <span class="mut">· ${esc(c.value || "")}</span>
+        ${c.managed ? pill("managed by policy", "info") : ""}${f && f.reboot && c.status === "fail" ? " " + pill("restart", "info") : ""}</div><div class="row">${btn}</div></div>
+      ${c.status === "fail" || c.detail ? `<details><summary>Why it matters${m ? " · how to fix" : ""}</summary>
+        ${c.detail ? `<div>${esc(c.detail)}</div>` : ""}${c.why ? `<div class="mut" style="margin-top:4px">${esc(c.why)}</div>` : ""}
+        ${m ? `<ol>${m.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>` : ""}
+        ${c.status === "fail" && !c.ignored && admin ? `<button class="ghost" style="font-size:12px" onclick="ignore('${c.id}')">Ignore (accept the risk)</button>` : ""}
+        ${c.ignored ? `<div class="mut">Ignored by ${esc(c.ignored.by)}: ${esc(c.ignored.reason || "")}</div>` : ""}</details>` : ""}</div>`;
+  }).join("") || `<div class="mut" style="padding:20px">Nothing to fix here 🎉</div>`;
+}
+
+async function fix(id, confirm = false) {
+  try {
+    const r = await CyberHub.fixPostureCheck(id, { confirm });
+    toast(r.status === "applied" ? `Fixed${r.reboot_required ? " - restart to finish" : ""}${r.message ? ". " + r.message : ""}`
+                                 : `Not applied: ${r.message}`, r.status !== "applied");
+    await load();
+  } catch (e) {
+    if (e.status === 428 && window.confirm(e.message + "\n\nApply the fix anyway?")) return fix(id, true);
+    if (e.status !== 428) toast(e.message, true);
+  }
+}
+async function fixAll() {
+  try {
+    const r = await CyberHub.fixAllPosture();
+    toast(`${r.applied.length} fixed, ${r.skipped.length} need your decision, score ${r.score_before} → ${r.score}` +
+          (r.reboot_required ? " · restart to finish" : ""));
+    await load();
+  } catch (e) { toast(e.message, true); }
+}
+function ignore(id) { const reason = prompt("Why is this risk acceptable? (shown in the list)"); if (reason !== null)
+  act(CyberHub.ignorePostureCheck(id, { reason }), "Ignored - it no longer lowers the score"); }
+function unignore(id) { act(CyberHub.unignorePostureCheck(id), "Watching it again"); }
+function undo(id) { if (window.confirm("Put the previous setting back? This lowers protection.")) act(CyberHub.revertPostureChange(id), "Undone"); }
+
+async function loadDefender() {
+  try {
+    const d = await CyberHub.defenderStatus(), x = d.defender || {};
+    const age = x.signature_age_days;
+    $("#def").innerHTML = `<table>
+      <tr><td class="mut">Definitions</td><td>${esc(x.signature_version || "–")} ${age != null ? pill(age === 0 ? "today" : age + " d old", age > 3 ? "medium" : "pass") : ""}</td></tr>
+      <tr><td class="mut">Engine / platform</td><td class="mono">${esc(x.engine_version || "–")} / ${esc(x.product_version || "–")}</td></tr>
+      <tr><td class="mut">Last quick scan</td><td>${x.quick_scan_age_days == null ? "never" : x.quick_scan_age_days + " day(s) ago"}</td></tr>
+      <tr><td class="mut">Protection</td><td>${[["Real-time", x.realtime], ["Behaviour", x.behavior], ["Downloads", x.ioav], ["Tamper", x.tamper]]
+        .map(([n, v]) => pill(n + (v ? " on" : " off"), v ? "pass" : "high")).join(" ")}</td></tr></table>
+      <h2 style="margin:12px 0 6px">Exclusions</h2>` + (d.exclusions_readable ? (d.exclusions.length ? `<table>${d.exclusions.map(e =>
+      `<tr><td>${pill(e.kind, "info")}</td><td class="mono">${esc(e.value)}</td><td>${e.risk ? pill("dangerous", "high") + `<div class="mut" style="font-size:12px">${esc(e.risk)}</div>` : pill("narrow", "pass")}</td></tr>`).join("")}</table>`
+      : `<div class="mut">No exclusions.</div>`) : `<div class="mut">Hidden - Windows only shows exclusions to an engine started as administrator.</div>`);
+  } catch (e) { $("#def").innerHTML = `<div class="mut">${esc(e.message)}</div>`; }
+}
+
+async function loadUpdates() {
+  try {
+    const u = await CyberHub.windowsUpdates(), up = u.update || {}, s = u.support, q = u.search || {};
+    $("#wu").innerHTML = `<table>
+      <tr><td class="mut">Windows version</td><td>${s ? `${esc(s.version)} ${s.end ? (s.days_left < 0 ? pill("unsupported since " + s.end, "high")
+        : pill("supported until " + s.end, s.days_left <= 60 ? "medium" : "pass")) : ""}` : "–"}</td></tr>
+      <tr><td class="mut">Last update installed</td><td>${up.last_install ? new Date(up.last_install).toLocaleDateString() : "unknown"}</td></tr>
+      <tr><td class="mut">Restart pending</td><td>${up.pending_reboot ? pill("yes", "medium") : pill("no", "pass")}</td></tr></table>
+      <h2 style="margin:12px 0 6px">Missing updates ${q.state === "running" ? '<span class="mut">· searching…</span>' : ""}</h2>` +
+      (q.updates ? (q.updates.length ? `<table>${q.updates.map(x => `<tr><td>${esc(x.title)}</td><td>${x.severity ? pill(x.severity, /critical/i.test(x.severity) ? "high" : "medium") : ""}</td>
+        <td class="mut">${x.size_mb} MB</td></tr>`).join("")}</table>` : `<div class="mut">None - up to date.</div>`)
+        : `<div class="mut">${q.state === "error" ? esc(q.error) : "Not searched yet."}</div>`) +
+      `<h2 style="margin:12px 0 6px">Recent history</h2><table>${(up.history || []).slice(0, 6).map(h =>
+        `<tr><td>${esc(h.title)}</td><td>${pill(h.result === 2 ? "ok" : h.result === 3 ? "partly" : "failed", h.result === 2 ? "pass" : "high")}</td>
+        <td class="mut">${h.date ? new Date(h.date).toLocaleDateString() : ""}</td></tr>`).join("")}</table>`;
+    if (q.state === "running") setTimeout(loadUpdates, 3000);
+  } catch (e) { $("#wu").innerHTML = `<div class="mut">${esc(e.message)}</div>`; }
+}
+async function searchUpdates() { try { await CyberHub.searchWindowsUpdates(); toast("Asking Windows Update - this can take a few minutes"); loadUpdates(); } catch (e) { toast(e.message, true); } }
+
+load();
+setInterval(() => { if (document.visibilityState === "visible") load(); }, 60000);
+</script>
+</body>
+</html>

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<!-- Cyber Hub - Firewall & network protection example (Part 9) | Developed by Syed Muhammad Tayyab
+     Copy this file + cyberhub-api.js (+ auth-example.html) into ../ui/, start the engine
+     (start_cyberhub_admin.bat to be able to change Windows Firewall), sign in at
+     /auth-example.html, then open http://127.0.0.1:8765/firewall-example.html -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cyber Hub · Firewall & network protection</title>
+<style>
+  :root{--bg:#0b1220;--card:rgba(30,58,138,.22);--line:rgba(96,165,250,.22);--txt:#e2e8f0;--mut:#94a3b8;--acc:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--crit:#dc2626;--c:#38bdf8;--v:#a78bfa}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 "Segoe UI",system-ui,sans-serif}
+  header,footer{padding:12px 24px;color:#93c5fd;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+  footer{color:var(--mut);justify-content:center} a{color:#93c5fd}
+  h1{margin:0;font-size:20px;color:var(--txt)} h2{margin:0 0 12px;font-size:14px;color:#bfdbfe;font-weight:600}
+  main{padding:0 24px 12px;display:grid;gap:16px;grid-template-columns:repeat(12,1fr)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;backdrop-filter:blur(10px)}
+  .s12{grid-column:span 12}.s8{grid-column:span 8}.s7{grid-column:span 7}.s6{grid-column:span 6}.s5{grid-column:span 5}.s4{grid-column:span 4}
+  @media(max-width:1100px){.s8,.s7,.s6,.s5,.s4{grid-column:span 12}}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center} .sp{justify-content:space-between}
+  .stat b{display:block;font-size:24px} .stat span{color:var(--mut);font-size:12px}
+  button,input,select{font:inherit;color:var(--txt);background:#0f172a;border:1px solid #334155;border-radius:8px;padding:5px 10px}
+  button{cursor:pointer;background:#1e3a8a;border-color:#1e40af} button.danger{background:#7f1d1d;border-color:#991b1b}
+  button.ghost{background:transparent;border-color:#334155} button:disabled{opacity:.45;cursor:not-allowed}
+  .switch{width:46px;height:24px;border-radius:99px;background:#334155;position:relative;cursor:pointer;flex:none;border:none;padding:0}
+  .switch i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s}
+  .switch.on{background:var(--ok)} .switch.on i{left:25px} .switch.red.on{background:var(--warn)}
+  table{width:100%;border-collapse:collapse;font-size:13px} td,th{padding:6px 4px;text-align:left;border-bottom:1px solid #1e293b;vertical-align:top}
+  th{color:var(--mut);font-weight:500}
+  .pill{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap}
+  .ok,.active,.on,.allow{background:#14532d;color:#86efac}.high,.critical,.off,.block,.missing{background:#7f1d1d;color:#fca5a5}
+  .medium,.partial,.temporary{background:#78350f;color:#fcd34d}.low{background:#1e3a5f;color:#93c5fd}
+  .info,.removed,.expired,.disabled,.unavailable{background:#334155;color:#cbd5e1}.cyberhub{background:rgba(56,189,248,.2);color:#7dd3fc}
+  .mut{color:var(--mut)} .mono{font-family:Consolas,monospace;font-size:12px;word-break:break-all}
+  .prof{flex:1;min-width:190px;border:1px solid var(--line);border-radius:14px;padding:12px;background:rgba(15,23,42,.45)}
+  .prof.isactive{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+  .prof h3{margin:0 0 6px;font-size:15px} .prof .line{display:flex;justify-content:space-between;align-items:center;margin:6px 0;font-size:12px}
+  .ring{width:132px;height:132px;flex:none}
+  .bars{display:flex;align-items:flex-end;gap:3px;height:110px} .bars .d{flex:1;display:flex;flex-direction:column-reverse;height:100%}
+  .bars .d i{display:block;border-radius:2px 2px 0 0} .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 10px}
+  .donut{width:120px;height:120px;border-radius:50%;flex:none;position:relative}
+  .donut::after{content:"";position:absolute;inset:22px;border-radius:50%;background:#0f1a33}
+  .tabs button{background:transparent;border-color:#334155} .tabs button.sel{background:#1e3a8a;border-color:#3b82f6}
+  .scroll{max-height:340px;overflow:auto} #gate{text-align:center;padding:60px}
+  .finding{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:start;padding:7px 0;border-bottom:1px solid #1e293b;font-size:13px}
+  .warnbox{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);border-radius:10px;padding:8px 10px;font-size:12px;color:#fde68a;margin-top:8px}
+  #toast{position:fixed;right:20px;bottom:20px;background:#1e3a8a;border:1px solid #3b82f6;padding:12px 16px;border-radius:12px;display:none;max-width:440px;z-index:6}
+  #toast.bad{background:#450a0a;border-color:#ef4444}
+</style>
+</head>
+<body>
+<header><h1>🧱 Cyber Hub · Firewall & network protection</h1>
+  <span>Developed by Syed Muhammad Tayyab · <a href="realtime-example.html">Real-time</a> · <a href="processes-example.html">Processes</a> · <a href="rules-example.html">Rules</a></span></header>
+<div id="gate" style="display:none">Sign in first at <a href="auth-example.html">auth-example.html</a>, then come back.</div>
+
+<main id="app" style="display:none">
+  <!-- profiles -->
+  <section class="card s8">
+    <div class="row sp"><h2 style="margin:0">Firewall status</h2>
+      <span class="row"><span id="state"></span><span class="mut" id="backend"></span></span></div>
+    <div id="elev" class="warnbox" style="display:none"></div>
+    <div class="row" id="profiles" style="margin-top:12px;align-items:stretch"></div>
+    <div class="row sp" style="margin-top:12px">
+      <span class="row">Block <b>all</b> incoming connections (even allowed apps)
+        <button class="switch red" id="swShield" onclick="act(CyberHub.shieldsUp(!this.classList.contains('on')), 'Saved')"><i></i></button></span>
+      <span class="row"><button class="ghost" onclick="act(CyberHub.firewallWatchNow(), 'Checked for changes')">Check for changes now</button>
+        <span class="mut" id="lastWatch"></span></span>
+    </div>
+  </section>
+
+  <!-- health -->
+  <section class="card s4">
+    <div class="row sp"><h2 style="margin:0">Firewall health</h2><span id="grade"></span></div>
+    <div class="row" style="margin-top:8px;gap:14px"><svg class="ring" viewBox="0 0 120 120" id="ring"></svg>
+      <div class="stat"><b id="nRules">–</b><span>rules</span><b id="nBlocks" style="margin-top:6px">–</b><span>Cyber Hub blocks</span></div></div>
+    <div class="scroll" id="findings" style="max-height:220px;margin-top:8px"></div>
+  </section>
+
+  <!-- quick block -->
+  <section class="card s6">
+    <h2>Block something</h2>
+    <div class="row tabs" id="tabs">
+      <button class="sel" data-k="app">Program</button><button data-k="ip">IP address</button><button data-k="port">Port</button><button data-k="allow">Allow an app</button></div>
+    <div class="row" style="margin-top:10px">
+      <input id="target" style="flex:1" placeholder="C:\Program Files\App\app.exe">
+      <select id="proto" style="display:none"><option value="tcp">TCP</option><option value="udp">UDP</option><option value="both">TCP + UDP</option></select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="dir"><option value="both">In + out</option><option value="in">Incoming</option><option value="out">Outgoing</option></select>
+      <select id="dur"><option value="">Until I remove it</option><option value="15">15 minutes</option><option value="60">1 hour</option><option value="1440">24 hours</option><option value="10080">7 days</option></select>
+      <input id="reason" placeholder="Reason (optional)" style="flex:1">
+      <button onclick="doBlock()" id="blockBtn">Block</button>
+    </div>
+    <div id="blockMsg"></div>
+  </section>
+
+  <!-- blocks -->
+  <section class="card s6">
+    <div class="row sp"><h2 style="margin:0">Cyber Hub blocks</h2>
+      <span class="row"><select id="bstat" onchange="refresh()"><option value="current">Current</option><option value="expired">Expired</option><option value="removed">Removed</option></select>
+        <button class="ghost" onclick="act(CyberHub.verifyBlocks(), 'Verified')">Verify</button></span></div>
+    <div class="scroll" style="margin-top:8px"><table><thead><tr><th>What</th><th>Kind</th><th>Direction</th><th>Time left</th><th>Status</th><th></th></tr></thead><tbody id="blocks"></tbody></table></div>
+  </section>
+
+  <!-- graphs -->
+  <section class="card s4">
+    <h2>Active rule mix</h2>
+    <div class="row" style="gap:16px"><div class="donut" id="donut"></div><div id="mixLegend" style="font-size:12px"></div></div>
+  </section>
+  <section class="card s8">
+    <div class="row sp"><h2 style="margin:0">Firewall events · last 14 days</h2>
+      <span class="legend mut" style="font-size:11px"><i style="background:var(--crit)"></i>critical<i style="background:var(--bad)"></i>high<i style="background:var(--warn)"></i>medium<i style="background:var(--c)"></i>blocks created</span></div>
+    <div class="bars" id="evChart" style="margin-top:10px"></div>
+  </section>
+
+  <!-- packet log -->
+  <section class="card s6">
+    <div class="row sp"><h2 style="margin:0">Dropped packets · last 24 h</h2><span class="mut" id="logInfo"></span></div>
+    <div class="bars" id="logChart" style="height:90px"></div>
+    <div class="row" style="margin-top:12px;align-items:flex-start;gap:16px">
+      <div style="flex:1"><b style="font-size:12px;color:#bfdbfe">Top blocked sources</b><table><tbody id="srcs"></tbody></table></div>
+      <div style="flex:1"><b style="font-size:12px;color:#bfdbfe">Most targeted ports</b><table><tbody id="ports"></tbody></table></div>
+    </div>
+    <div id="scans"></div>
+  </section>
+
+  <!-- alerts -->
+  <section class="card s6">
+    <div class="row sp"><h2 style="margin:0">Alerts & changes</h2>
+      <span class="row"><span id="unread"></span><button class="ghost" onclick="act(CyberHub.ackFirewallEvents(), 'Marked as read')">Mark all read</button></span></div>
+    <div class="scroll" style="margin-top:8px"><table><tbody id="events"></tbody></table></div>
+  </section>
+
+  <!-- rules -->
+  <section class="card s12">
+    <div class="row sp"><h2 style="margin:0">Firewall rules <span class="mut" id="ruleCount"></span></h2>
+      <span class="row">
+        <input id="rq" placeholder="Search name, program, port, address" oninput="clearTimeout(this._t);this._t=setTimeout(loadRules,300)">
+        <select id="rdir" onchange="loadRules()"><option value="">In + out</option><option value="in">Inbound</option><option value="out">Outbound</option></select>
+        <select id="ract" onchange="loadRules()"><option value="">Allow + block</option><option value="allow">Allow</option><option value="block">Block</option></select>
+        <select id="rorg" onchange="loadRules()"><option value="all">All rules</option><option value="cyberhub">Cyber Hub</option><option value="system">Windows / apps</option><option value="policy">Group Policy</option></select>
+        <label class="row" style="font-size:12px"><input type="checkbox" id="rflag" onchange="loadRules()"> risky only</label>
+      </span></div>
+    <div class="scroll" style="margin-top:10px;max-height:420px"><table><thead><tr><th>On</th><th>Name</th><th>Dir</th><th>Action</th><th>Program / service</th><th>Ports</th><th>Remote</th><th>Profiles</th><th>Risk</th><th></th></tr></thead>
+      <tbody id="rules"></tbody></table></div>
+  </section>
+
+  <!-- snapshots -->
+  <section class="card s12">
+    <div class="row sp"><h2 style="margin:0">Policy snapshots</h2>
+      <span class="row"><input id="snote" placeholder="Note, e.g. before installing a game"><button onclick="act(CyberHub.saveFirewallSnapshot($('snote').value), 'Snapshot saved')">Save snapshot</button>
+        <button class="danger" onclick="if(confirm('Reset the firewall to Windows defaults? Every custom rule (Cyber Hub blocks too) is removed. A snapshot is saved first.')) act(CyberHub.resetFirewall(), 'Firewall reset - safety snapshot saved')">Reset to defaults</button></span></div>
+    <table style="margin-top:8px"><thead><tr><th>#</th><th>Saved</th><th>Note</th><th>Rules</th><th>By</th><th></th></tr></thead><tbody id="snaps"></tbody></table>
+  </section>
+</main>
+<footer>Cyber Hub · Firewall & network protection (Part 9 of 20) · Developed by Syed Muhammad Tayyab</footer>
+<div id="toast"></div>
+<script src="cyberhub-api.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pill = (t, cls) => `<span class="pill ${esc(cls || t)}">${esc(t)}</span>`;
+const ago = s => { if (!s) return "never"; const m = Math.round((Date.now() - Date.parse(s)) / 60000); return m < 1 ? "just now" : m < 60 ? m + " min ago" : Math.round(m / 60) + " h ago"; };
+const left = s => s == null ? "—" : s > 86400 ? Math.round(s / 86400) + " d" : s > 3600 ? Math.round(s / 3600) + " h" : Math.max(1, Math.round(s / 60)) + " min";
+const DIR = { in: "Incoming", out: "Outgoing", both: "In + out" };
+function toast(msg, bad) { const t = $("toast"); t.textContent = msg; t.className = bad ? "bad" : ""; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 5000); }
+async function act(p, ok) { try { const r = await p; if (ok) toast(ok); await refresh(); return r; } catch (e) { toast(e.message, true); } }
+let kind = "app";
+
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("sel", x === b)); kind = b.dataset.k;
+  $("target").placeholder = { app: "C:\\Program Files\\App\\app.exe", ip: "203.0.113.5, 198.51.100.0/24, 10.0.0.5-10.0.0.20",
+                              port: "3389  or  6000-6010  or  80,443", allow: "C:\\Program Files\\Game\\server.exe" }[kind];
+  $("proto").style.display = kind === "port" ? "" : "none";
+  $("dir").disabled = $("dur").disabled = kind === "allow"; $("dir").value = kind === "port" ? "in" : "both";
+  $("blockBtn").textContent = kind === "allow" ? "Allow (Private networks)" : "Block";
+});
+
+async function doBlock() {
+  const v = $("target").value.trim(); if (!v) return;
+  const opt = { direction: $("dir").value, minutes: $("dur").value ? +$("dur").value : null, reason: $("reason").value || undefined };
+  try {
+    const r = kind === "app" ? await CyberHub.blockApp(v, opt)
+            : kind === "ip" ? await CyberHub.blockIp(v.split(/[\s,]+/).filter(Boolean), opt)
+            : kind === "port" ? await CyberHub.blockPort(v, { ...opt, protocol: $("proto").value })
+            : await CyberHub.allowApp(v, ["private"], opt.reason);
+    $("blockMsg").innerHTML = (r.already ? `<div class="warnbox">Already blocked (#${r.id}).</div>` : "") +
+      (r.warnings || []).map(w => `<div class="warnbox">⚠ ${esc(w)}</div>`).join("");
+    toast(`${r.kind === "allow_app" ? "Allowed" : "Blocked"} ${r.label}`); $("target").value = ""; await refresh();
+  } catch (e) { $("blockMsg").innerHTML = `<div class="warnbox" style="color:#fca5a5">${esc(e.message)}</div>`; }
+}
+
+function ring(score) {
+  const r = 50, c = 2 * Math.PI * r, col = score >= 90 ? "var(--ok)" : score >= 70 ? "var(--c)" : score >= 50 ? "var(--warn)" : "var(--bad)";
+  $("ring").innerHTML = `<circle cx="60" cy="60" r="${r}" fill="none" stroke="#1e293b" stroke-width="12"/>
+    <circle cx="60" cy="60" r="${r}" fill="none" stroke="${col}" stroke-width="12" stroke-linecap="round" transform="rotate(-90 60 60)"
+      stroke-dasharray="${c * (score ?? 0) / 100} ${c}"/>
+    <text x="60" y="66" text-anchor="middle" font-size="26" font-weight="700" fill="#e2e8f0">${score ?? "–"}</text>`;
+}
+
+function bars(el, rows, series) {
+  const max = Math.max(1, ...rows.map(r => series.reduce((a, [k]) => a + (r[k] || 0), 0)));
+  $(el).innerHTML = rows.map(r => `<div class="d" title="${esc(r.day || r.hour)}">` + series.map(([k, col]) =>
+    `<i style="height:${(r[k] || 0) / max * 100}%;background:${col}"></i>`).join("") + "</div>").join("");
+}
+
+async function loadRules() {
+  try {
+    const flag = $("rflag").checked;
+    const j = await CyberHub.firewallRules({ search: $("rq").value || undefined, direction: $("rdir").value || undefined,
+      action: $("ract").value || undefined, origin: $("rorg").value, flagged: flag, sort: flag ? "risk" : "name", limit: 300 });
+    $("ruleCount").textContent = `· ${j.total} shown of ${j.counts.total} (${j.counts.flagged} risky)`;
+    $("rules").innerHTML = j.items.map(r => `<tr>
+      <td>${r.editable ? `<button class="switch ${r.enabled ? "on" : ""}" onclick="act(CyberHub.setFirewallRule('${esc(r.id)}', ${!r.enabled}), 'Saved').then(loadRules)"><i></i></button>` : pill("policy", "info")}</td>
+      <td>${esc(r.name)} ${r.cyberhub ? pill("Cyber Hub", "cyberhub") : ""}<div class="mut" style="font-size:11px">${esc(r.group || "")}</div></td>
+      <td>${r.direction === "in" ? "In" : "Out"}</td><td>${pill(r.action)}</td>
+      <td class="mono">${esc(r.program || r.service || r.package || "any")}</td>
+      <td>${esc(r.protocol !== "any" ? r.protocol.toUpperCase() + " " : "")}${esc(r.local_ports !== "any" ? r.local_ports : r.remote_ports)}</td>
+      <td class="mono">${esc(r.remote_addresses)}</td><td>${esc(r.profiles.join(", "))}</td>
+      <td>${r.risk ? pill(r.risk) + `<div class="mut" style="font-size:11px">${esc(r.flags.map(f => f.text).join("; "))}</div>` : ""}</td>
+      <td>${r.cyberhub && !r.block_id ? `<button class="ghost" onclick="act(CyberHub.deleteFirewallRule('${esc(r.id)}'), 'Deleted').then(loadRules)">Delete</button>` : ""}</td></tr>`).join("")
+      || `<tr><td colspan="10" class="mut">No rules match.</td></tr>`;
+  } catch (e) { $("rules").innerHTML = `<tr><td colspan="10" style="color:#fca5a5">${esc(e.message)}</td></tr>`; }
+}
+
+async function refresh() {
+  const [st, an, sum, bl, ev, sn] = await Promise.all([CyberHub.firewallStatus(), CyberHub.firewallAnalysis().catch(() => null),
+    CyberHub.firewallSummary(14), CyberHub.firewallBlocks({ status: $("bstat").value }), CyberHub.firewallEvents({ limit: 60 }),
+    CyberHub.firewallSnapshots().catch(() => ({ snapshots: [] }))]);
+  $("state").innerHTML = pill(st.state === "on" ? "Firewall on" : st.state === "partial" ? "Partly off" : st.state === "off" ? "Firewall OFF" : "Unavailable", st.state);
+  $("backend").textContent = st.backend.label;
+  $("elev").style.display = st.backend.available && !st.can_modify ? "" : st.backend.available ? "none" : "";
+  $("elev").textContent = !st.backend.available ? st.backend.reason : "Read-only: Cyber Hub is not running as administrator. Start it with start_cyberhub_admin.bat to turn the firewall on/off, block apps and apply fixes.";
+  $("profiles").innerHTML = st.profiles.map(p => {
+    const net = st.networks.filter(n => n.profile === p.name).map(n => n.name).join(", ");
+    return `<div class="prof ${p.active ? "isactive" : ""}"><div class="row sp"><h3>${p.name === "all" ? "All networks" : p.name[0].toUpperCase() + p.name.slice(1) + " network"}</h3>
+      <button class="switch ${p.enabled ? "on" : ""}" onclick="act(CyberHub.setFirewallProfile('${p.name}', {enabled: ${!p.enabled}}), 'Saved')"><i></i></button></div>
+      <div class="mut" style="font-size:12px">${p.active ? "🔌 Connected: " + esc(net) : "Not in use"}</div>
+      <div class="line">Incoming by default ${pill(p.default_inbound)}</div><div class="line">Outgoing by default ${pill(p.default_outbound)}</div>
+      <div class="line">Notify when an app is blocked <button class="switch ${p.notify_on_listen ? "on" : ""}" onclick="act(CyberHub.setFirewallProfile('${p.name}', {notify_on_listen: ${!p.notify_on_listen}}), 'Saved')"><i></i></button></div>
+      <div class="line">Log dropped packets <button class="switch ${p.log_blocked ? "on" : ""}" onclick="act(CyberHub.setFirewallProfile('${p.name}', {log_blocked: ${!p.log_blocked}}), 'Saved')"><i></i></button></div></div>`;
+  }).join("");
+  $("swShield").classList.toggle("on", !!st.shields_up);
+  $("lastWatch").textContent = "last check " + ago(st.last_watch);
+  $("nRules").textContent = st.rules.total ?? "–"; $("nBlocks").textContent = st.blocks.active;
+
+  ring(an ? an.score : null); $("grade").innerHTML = an ? pill(an.grade, an.score >= 90 ? "ok" : an.score >= 70 ? "low" : an.score >= 50 ? "medium" : "high") : "";
+  $("findings").innerHTML = an ? an.findings.map(f => `<div class="finding">${pill(f.severity)}
+      <div><b>${esc(f.title)}</b><div class="mut" style="font-size:12px">${esc(f.detail)}</div></div>
+      ${f.fix ? `<button onclick="act(CyberHub.fixFirewallFinding('${esc(f.id)}'), 'Fixed')">${esc(f.fix_label)}${f.fix_requires_admin ? " 🔒" : ""}</button>` : "<span></span>"}</div>`).join("")
+      || `<div class="mut">No issues found 🎉</div>` : "";
+
+  const m = sum.rules || {}, parts = [["inbound_allow", "#22c55e", "Inbound allow"], ["inbound_block", "#ef4444", "Inbound block"],
+    ["outbound_allow", "#38bdf8", "Outbound allow"], ["outbound_block", "#f59e0b", "Outbound block"]];
+  const tot = parts.reduce((a, [k]) => a + (m[k] || 0), 0) || 1; let acc = 0;
+  $("donut").style.background = "conic-gradient(" + parts.map(([k, col]) => { const a = acc; acc += (m[k] || 0) / tot * 360; return `${col} ${a}deg ${acc}deg`; }).join(",") + ")";
+  $("mixLegend").innerHTML = parts.map(([k, col, l]) => `<div><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${col};margin-right:6px"></i>${l}: <b>${m[k] ?? 0}</b></div>`).join("") +
+    `<div class="mut" style="margin-top:6px">${m.disabled ?? 0} switched off · ${m.cyberhub ?? 0} by Cyber Hub</div>`;
+  bars("evChart", sum.per_day, [["critical", "var(--crit)"], ["high", "var(--bad)"], ["medium", "var(--warn)"], ["blocks_created", "var(--c)"]]);
+
+  $("blocks").innerHTML = bl.items.map(b => `<tr><td><b>${esc(b.label)}</b><div class="mut mono" style="font-size:11px">${esc(b.kind === "app" || b.kind === "allow_app" ? b.target : b.reason || "")}</div></td>
+      <td>${pill(b.kind === "allow_app" ? "allow app" : b.kind, b.kind === "allow_app" ? "allow" : "info")}</td><td>${DIR[b.direction]}</td>
+      <td>${b.temporary ? pill(left(b.remaining_seconds), "temporary") : "—"}</td><td>${pill(b.status)}</td>
+      <td>${b.status === "missing" ? `<button onclick="act(CyberHub.repairBlock(${b.id}), 'Repaired')">Repair</button>` : ""}
+        ${["active", "missing"].includes(b.status) ? `<button class="ghost" onclick="act(CyberHub.unblock(${b.id}), 'Removed')">${b.kind === "allow_app" ? "Remove" : "Unblock"} 🔒</button>` : ""}</td></tr>`).join("")
+      || `<tr><td colspan="6" class="mut">Nothing here yet.</td></tr>`;
+
+  const unread = ev.items.filter(e => !e.acknowledged).length;
+  $("unread").innerHTML = unread ? pill(unread + " new", "high") : "";
+  $("events").innerHTML = ev.items.map(e => `<tr style="${e.acknowledged ? "" : "font-weight:600"}"><td style="white-space:nowrap" class="mut">${ago(e.ts)}</td>
+      <td>${pill(e.severity)}</td><td>${esc(e.title)}<div class="mut" style="font-size:11px;font-weight:400">${esc(e.detail || "")}${e.username ? " · " + esc(e.username) : ""}</div></td></tr>`).join("")
+      || `<tr><td class="mut">No firewall events yet.</td></tr>`;
+
+  $("snaps").innerHTML = sn.snapshots.map(s => `<tr><td>${s.id}</td><td>${new Date(s.created_at).toLocaleString()}</td>
+      <td>${esc(s.note || "")} ${s.auto ? pill("auto", "info") : ""}</td><td>${s.rules ?? "–"}</td><td>${esc(s.created_by || "")}</td>
+      <td><button class="ghost" onclick="if(confirm('Restore snapshot #${s.id}? The current policy is saved first.')) act(CyberHub.restoreFirewallSnapshot(${s.id}), 'Restored')">Restore 🔒</button>
+        <button class="ghost" onclick="act(CyberHub.deleteFirewallSnapshot(${s.id}), 'Deleted')">Delete 🔒</button></td></tr>`).join("")
+      || `<tr><td colspan="6" class="mut">No snapshots yet - save one before big changes.</td></tr>`;
+  loadLog();
+}
+
+async function loadLog() {
+  try {
+    const l = await CyberHub.firewallLog(24, 20);
+    $("logInfo").textContent = `${l.drops} dropped · ${l.allows} allowed`;
+    bars("logChart", l.by_hour, [["drops", "var(--bad)"]]);
+    $("srcs").innerHTML = l.top_sources.map(s => `<tr><td class="mono">${esc(s.address)}</td><td>${s.drops}</td>
+      <td><button class="ghost" onclick="act(CyberHub.blockIp('${esc(s.address)}', {direction: 'in', reason: 'Knocking on blocked ports'}), 'Blocked ${esc(s.address)}')">Block</button></td></tr>`).join("") || `<tr><td class="mut">—</td></tr>`;
+    $("ports").innerHTML = l.top_ports.map(p => `<tr><td>${p.port}</td><td class="mut">${esc(p.service || "")}</td><td>${p.drops}</td></tr>`).join("") || `<tr><td class="mut">—</td></tr>`;
+    $("scans").innerHTML = l.port_scan_suspects.map(s => `<div class="warnbox">🔎 Port scan suspected: <b>${esc(s.address)}</b> tried ${s.distinct_ports} different ports</div>`).join("");
+  } catch (e) { $("logInfo").textContent = ""; $("logChart").innerHTML = `<div class="mut" style="font-size:12px">${esc(e.message)}</div>`; }
+}
+
+(async () => {
+  try { await CyberHub.firewallStatus(); } catch (e) { $("gate").style.display = "block"; return; }
+  $("app").style.display = "grid"; await refresh(); await loadRules();
+  setInterval(refresh, 15000);
+})();
+</script>
+</body>
+</html>

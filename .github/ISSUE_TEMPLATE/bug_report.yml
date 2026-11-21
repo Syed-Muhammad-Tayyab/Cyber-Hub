@@ -1,0 +1,56 @@
+# Cyber Hub - bug report form (Developed by Syed Muhammad Tayyab)
+name: 🐞 Bug report
+description: Something in Cyber Hub doesn't work as expected
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve **Cyber Hub**! 🛡️
+        ⚠️ **Security problem?** Don't open a public issue - see [SECURITY.md](../../SECURITY.md).
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Dashboard / security score
+        - Virus & threats (scan, quarantine, real-time)
+        - Firewall / network / Wi-Fi
+        - Device security (Windows checks)
+        - Password vault
+        - Data protection
+        - Accounts & platforms
+        - Website scanner / threat intel
+        - Scheduler / notifications
+        - Reports & backup
+        - Desktop app / installer
+        - Other
+    validations: { required: true }
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Open ...\n2. Click ...\n3. See ..."
+  - type: input
+    id: version
+    attributes:
+      label: Cyber Hub version
+      description: Shown on the About page
+      placeholder: "1.0.0"
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 24H2"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Diagnostics
+      description: "Reports & backup → Settings & logs → Export logs. It contains no passwords or keys - but please look before attaching."

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<!-- Cyber Hub - Real-time protection example (Part 7) | Developed by Syed Muhammad Tayyab
+     Copy this file + cyberhub-api.js (+ auth-example.html) into ../ui/, start the engine,
+     sign in at /auth-example.html, then open http://127.0.0.1:8765/realtime-example.html -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cyber Hub · Real-time protection</title>
+<style>
+  :root{--bg:#0b1220;--card:rgba(30,58,138,.22);--line:rgba(96,165,250,.22);--txt:#e2e8f0;--mut:#94a3b8;--acc:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 "Segoe UI",system-ui,sans-serif}
+  header,footer{padding:12px 24px;color:#93c5fd;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+  footer{color:var(--mut);justify-content:center}
+  h1{margin:0;font-size:20px;color:var(--txt)} h2{margin:0 0 12px;font-size:14px;color:#bfdbfe;font-weight:600}
+  main{padding:0 24px 12px;display:grid;gap:16px;grid-template-columns:repeat(12,1fr)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;backdrop-filter:blur(10px)}
+  .s12{grid-column:span 12}.s8{grid-column:span 8}.s6{grid-column:span 6}.s4{grid-column:span 4}.s3{grid-column:span 3}
+  @media(max-width:1000px){.s8,.s6,.s4,.s3{grid-column:span 12}}
+  .hero{display:flex;align-items:center;gap:20px}
+  .shield{width:84px;height:84px;border-radius:50%;display:grid;place-items:center;font-size:38px;flex:none;background:rgba(34,197,94,.18);position:relative}
+  .shield.on:after{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid rgba(34,197,94,.5);animation:pulse 2s infinite}
+  .shield.warn{background:rgba(245,158,11,.2)} .shield.bad{background:rgba(239,68,68,.2)}
+  @keyframes pulse{0%{transform:scale(1);opacity:1}100%{transform:scale(1.25);opacity:0}}
+  .switch{width:52px;height:28px;border-radius:99px;background:#334155;position:relative;cursor:pointer;flex:none;border:none;padding:0}
+  .switch i{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .2s}
+  .switch.on{background:var(--ok)} .switch.on i{left:27px}
+  .stat b{display:block;font-size:26px} .stat span{color:var(--mut);font-size:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px} td,th{padding:6px 4px;text-align:left;border-bottom:1px solid #1e293b;vertical-align:top}
+  th{color:var(--mut);font-weight:500}
+  .pill{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap}
+  .clean,.watching{background:#14532d;color:#86efac}.infected,.high,.critical{background:#7f1d1d;color:#fca5a5}
+  .skipped,.missing,.off,.snoozed,.info{background:#334155;color:#cbd5e1}.medium{background:#78350f;color:#fcd34d}.low{background:#1e3a8a;color:#bfdbfe}
+  .quarantined{background:#1e3a8a;color:#bfdbfe}.alerted,.failed{background:#78350f;color:#fcd34d}
+  button,input,select{font:inherit;color:var(--txt);background:#0f172a;border:1px solid #334155;border-radius:8px;padding:4px 9px}
+  button{cursor:pointer;background:#1e3a8a;border-color:#1e40af} button.danger{background:#7f1d1d;border-color:#991b1b}
+  .mut{color:var(--mut)} .mono{font-family:Consolas,monospace;font-size:12px;word-break:break-all}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .bars{display:flex;align-items:flex-end;gap:6px;height:120px}
+  .bars .day{flex:1;height:100%;display:flex;align-items:flex-end;gap:2px;position:relative}
+  .bars .day i{flex:1;border-radius:4px 4px 0 0;min-height:2px}
+  .usb{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+  .usb.live{border-color:rgba(34,197,94,.6)}
+  .warnbox{margin-top:8px;padding:8px;border-radius:8px;background:rgba(239,68,68,.12);font-size:12px}
+  .scroll{max-height:380px;overflow:auto} #gate{text-align:center;padding:60px}
+  #toast{position:fixed;right:20px;bottom:20px;background:#1e3a8a;border:1px solid #3b82f6;padding:12px 16px;border-radius:12px;display:none;max-width:400px;z-index:6}
+  #toast.bad{background:#450a0a;border-color:#ef4444}
+  .live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px;animation:blink 1.2s infinite}
+  @keyframes blink{50%{opacity:.25}}
+</style>
+</head>
+<body>
+<header><h1>🛡️ Cyber Hub · Real-time protection</h1><span>Developed by Syed Muhammad Tayyab · <a href="scanner-example.html" style="color:#93c5fd">Scanner</a> · <a href="quarantine-example.html" style="color:#93c5fd">Quarantine</a></span></header>
+<div id="gate" style="display:none">Sign in first at <a href="auth-example.html" style="color:#93c5fd">auth-example.html</a>, then come back.</div>
+
+<main id="app" style="display:none">
+  <section class="card s8 hero">
+    <div id="shield" class="shield">🛡️</div>
+    <div style="flex:1">
+      <div class="row" style="justify-content:space-between">
+        <h2 id="stateText" style="font-size:18px;color:var(--txt);margin:0">…</h2>
+        <button id="toggle" class="switch" title="Real-time protection" onclick="toggle()"><i></i></button>
+      </div>
+      <div class="mut" id="stateSub" style="margin-top:4px"></div>
+      <div class="row" style="margin-top:12px">
+        <select id="pauseMin"><option value="15">15 min</option><option value="30" selected>30 min</option><option value="60">1 hour</option><option value="240">4 hours</option></select>
+        <button onclick="pause()">Pause</button>
+        <button id="resumeBtn" onclick="act(CyberHub.realtimeResume())" style="display:none">Resume now</button>
+        <button onclick="selfTest()">Self-test</button>
+        <span class="mut" id="feedState"></span>
+      </div>
+    </div>
+  </section>
+  <section class="card s4">
+    <h2>Since engine start</h2>
+    <div class="row" style="justify-content:space-between">
+      <div class="stat"><b id="cScanned">0</b><span>files checked</span></div>
+      <div class="stat"><b id="cThreats" style="color:var(--bad)">0</b><span>threats stopped</span></div>
+      <div class="stat"><b id="cQueue">0</b><span>waiting</span></div>
+    </div>
+    <div class="mut" id="lastThreat" style="margin-top:10px;font-size:12px"></div>
+  </section>
+
+  <section class="card s6">
+    <h2>Protected folders</h2>
+    <table><tbody id="folders"></tbody></table>
+    <div class="row" style="margin-top:10px">
+      <input id="newFolder" placeholder="C:\Users\you\Projects" style="flex:1">
+      <button onclick="addFolder()">Add folder</button>
+    </div>
+  </section>
+  <section class="card s6">
+    <h2>Last 14 days <span class="mut" style="font-weight:400">· <i style="color:#3b82f6">■</i> files checked <i style="color:#ef4444">■</i> threats <i style="color:#f59e0b">■</i> USB plug-ins</span></h2>
+    <div class="bars" id="bars"></div>
+    <div class="row mut" style="justify-content:space-between;font-size:11px;margin-top:4px"><span id="d0"></span><span id="d1"></span></div>
+  </section>
+
+  <section class="card s4">
+    <h2>USB &amp; removable drives</h2>
+    <div id="usb" class="scroll"></div>
+  </section>
+  <section class="card s8">
+    <h2><span class="live-dot"></span>Live activity
+      <select id="filter" onchange="loadEvents()" style="float:right"><option value="">All</option><option value="infected">Threats</option><option value="skipped">Skipped</option><option value="clean">Clean</option></select></h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Time</th><th>File</th><th>Result</th><th>Action</th></tr></thead>
+      <tbody id="events"></tbody></table></div>
+  </section>
+</main>
+<div id="toast"></div>
+<footer>Cyber Hub · Developed by Syed Muhammad Tayyab</footer>
+
+<script src="cyberhub-api.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const t = ts => ts ? new Date(ts).toLocaleTimeString() : "";
+const gb = n => n ? (n / 2 ** 30).toFixed(1) + " GB" : "?";
+function toast(msg, bad) { const e = $("toast"); e.innerHTML = msg; e.className = bad ? "bad" : ""; e.style.display = "block";
+  clearTimeout(e._t); e._t = setTimeout(() => e.style.display = "none", 6000); }
+async function act(p) { try { await p; } catch (e) { toast("⚠️ " + esc(e.message), true); } refresh(); }
+
+const STATES = {
+  on: ["Real-time protection is on", "New and changed files are checked the moment they land", "on"],
+  on_no_folders: ["On, but no folder is being watched", "Add a folder or turn default folders back on", "warn"],
+  snoozed: ["Real-time protection is paused", "", "warn"],
+  off: ["Real-time protection is off", "Your device may be vulnerable. Turn it back on.", "bad"],
+  unavailable: ["Real-time protection unavailable", "", "bad"], error: ["Real-time protection error", "", "bad"],
+  stopped: ["Engine starting…", "", "warn"],
+};
+
+async function refresh() {
+  const s = await CyberHub.realtimeStatus();
+  const [title, sub, cls] = STATES[s.state] || [s.state, "", "warn"];
+  $("stateText").textContent = title;
+  $("stateSub").textContent = s.state === "snoozed" ? "Comes back on at " + new Date(s.snoozed_until).toLocaleTimeString()
+                              : (s.error || sub);
+  $("shield").className = "shield " + cls;
+  $("toggle").className = "switch" + (s.enabled ? " on" : "");
+  $("resumeBtn").style.display = s.state === "snoozed" ? "" : "none";
+  paintCounters(s);
+  $("folders").innerHTML = s.folders.map(f => `<tr>
+    <td>${f.kind === "usb" ? "🔌" : f.kind === "custom" ? "📁" : "⭐"} <b>${esc(f.label)}</b><div class="mono mut">${esc(f.path)}</div></td>
+    <td><span class="pill ${f.status}">${f.status}</span></td>
+    <td>${f.kind === "custom" ? `<button class="danger" onclick='act(CyberHub.removeProtectedFolder(${JSON.stringify(f.path)}))'>Remove</button>` : ""}</td></tr>`).join("")
+    || `<tr><td class="mut">No folders</td></tr>`;
+  loadUsb(); loadSummary(); loadEvents();
+}
+function paintCounters(s) {
+  $("cScanned").textContent = s.counters.files_scanned; $("cThreats").textContent = s.counters.threats; $("cQueue").textContent = s.queue;
+  if (s.last_threat) $("lastThreat").innerHTML = `Last threat: <b>${esc(s.last_threat.threat_name)}</b> · ${esc(s.last_threat.action)}`;
+}
+async function loadUsb() {
+  const { devices } = await CyberHub.usbDevices();
+  $("usb").innerHTML = devices.map(d => `<div class="usb ${d.connected ? "live" : ""}">
+    <div class="row" style="justify-content:space-between"><b>🔌 ${esc(d.label || d.model || "USB drive")}</b>
+      <span class="pill ${d.connected ? "watching" : "off"}">${d.connected ? "plugged in " + esc(d.mountpoint) : "unplugged"}</span></div>
+    <div class="mut" style="font-size:12px">${gb(d.total_bytes)} · ${esc(d.fstype || "?")} · seen ${d.insert_count}× · last ${new Date(d.last_seen).toLocaleString()}</div>
+    ${d.warnings.length ? `<div class="warnbox">${d.warnings.map(w => `<div><span class="pill ${w.severity}">${w.severity}</span> ${esc(w.title)}<div class="mut">${esc(w.detail)}</div></div>`).join("")}</div>` : ""}
+    <div class="row" style="margin-top:8px">
+      ${d.connected ? `<button onclick="act(CyberHub.scanUsb(${d.id}).then(j=>toast('Scan job '+j.id+' started')))">Scan drive</button>` : ""}
+      <button onclick="act(CyberHub.trustUsb(${d.id}, ${!d.trusted}))">${d.trusted ? "✓ Trusted" : "Trust"}</button>
+      ${!d.connected ? `<button class="danger" onclick="act(CyberHub.forgetUsb(${d.id}))">Forget</button>` : ""}
+    </div></div>`).join("") || `<div class="mut">No USB drives seen yet. Plug one in.</div>`;
+}
+async function loadSummary() {
+  const s = await CyberHub.realtimeSummary(14);
+  const max = Math.max(1, ...s.by_day.map(d => d.files_scanned));
+  $("bars").innerHTML = s.by_day.map(d => `<div class="day" title="${d.day}: ${d.files_scanned} checked, ${d.threats} threats, ${d.usb_inserts} USB">
+    <i style="height:${d.files_scanned / max * 100}%;background:#3b82f6"></i>
+    <i style="height:${Math.min(100, d.threats * 20)}%;background:#ef4444"></i>
+    <i style="height:${Math.min(100, d.usb_inserts * 20)}%;background:#f59e0b"></i></div>`).join("");
+  $("d0").textContent = s.by_day[0].day; $("d1").textContent = s.by_day.at(-1).day;
+}
+async function loadEvents() {
+  const { items } = await CyberHub.realtimeEvents({ status: $("filter").value || undefined, limit: 60 });
+  $("events").innerHTML = items.map(rowHtml).join("") || `<tr><td colspan="4" class="mut">Nothing yet - save a file into a protected folder.</td></tr>`;
+}
+const rowHtml = e => `<tr><td>${t(e.ts)}</td>
+  <td><div class="mono">${esc(e.path)}</div>${e.threat_name ? `<b style="color:#fca5a5">${esc(e.threat_name)}</b>` : ""}
+      ${e.downloaded_from ? `<div class="mut" style="font-size:11px">from ${esc(e.downloaded_from)}</div>` : ""}</td>
+  <td><span class="pill ${e.status}">${e.status}${e.reason ? " · " + esc(e.reason) : ""}</span></td>
+  <td>${e.action && e.action !== "none" ? `<span class="pill ${e.action}">${e.action}</span>` : ""}</td></tr>`;
+
+async function toggle() {
+  const s = await CyberHub.realtimeStatus();
+  if (s.enabled && !confirm("Turn off real-time protection? Your device will be more vulnerable.")) return;
+  act(s.enabled ? CyberHub.realtimeDisable() : CyberHub.realtimeEnable());
+}
+const pause = () => act(CyberHub.realtimePause(+$("pauseMin").value));
+const addFolder = () => { const p = $("newFolder").value.trim(); if (p) act(CyberHub.addProtectedFolder(p).then(() => $("newFolder").value = "")); };
+async function selfTest() {
+  try { const r = await CyberHub.realtimeSelfTest();
+    toast(r.ok ? `✅ File events work (${r.latency_ms} ms) · scan engine OK` : "❌ " + esc(r.error || "File events not received"), !r.ok);
+  } catch (e) { toast("⚠️ " + esc(e.message), true); }
+}
+
+function live() {
+  CyberHub.streamRealtime(({ status, events }) => {
+    $("feedState").textContent = "● live";
+    paintCounters({ counters: status.counters, queue: status.queue });
+    let reload = false;
+    for (const ev of events) {
+      if (ev.type === "threat_blocked") toast(`🛡️ <b>Threat blocked</b><br>${esc(ev.event.threat_name)}<div class="mono">${esc(ev.event.path)}</div>`, true);
+      if (ev.type === "threat_found") toast(`⚠️ <b>Threat found</b> (${esc(ev.event.action)})<br>${esc(ev.event.threat_name)}<div class="mono">${esc(ev.event.path)}</div>`, true);
+      if (ev.type === "usb_inserted") toast(`🔌 <b>${esc(ev.device.label || "USB drive")}</b> connected` +
+        (ev.warnings.length ? `<br>⚠️ ${ev.warnings.map(w => esc(w.title)).join("<br>⚠️ ")}` : "") +
+        (ev.scan_job ? `<br>Scanning it now (job ${ev.scan_job.id})` : ev.suggest_scan ? `<br><button onclick="act(CyberHub.scanUsb(${ev.device.id}))">Scan it</button>` : ""), ev.warnings.length > 0);
+      if (ev.type === "burst") toast(`⚠️ <b>Unusual burst of file changes</b><br>${ev.changes} changes in ${ev.window_seconds}s<div class="mono">${esc(ev.folder)}</div>`, true);
+      if (ev.type === "file_scanned") {
+        const tb = $("events"); if (!$("filter").value) { tb.insertAdjacentHTML("afterbegin", rowHtml(ev.event)); while (tb.rows.length > 60) tb.deleteRow(-1); }
+      } else reload = true;
+    }
+    if (reload) refresh();
+  }, { onClose: () => { $("feedState").textContent = "○ reconnecting…"; setTimeout(live, 3000); } });
+}
+
+(async () => {
+  try { await CyberHub.realtimeStatus(); } catch (e) { $("gate").style.display = "block"; return; }
+  $("app").style.display = "grid"; refresh(); live();
+})();
+</script>
+</body>
+</html>

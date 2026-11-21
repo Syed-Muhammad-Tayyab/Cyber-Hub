@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="330" viewBox="0 0 1200 330" role="img" aria-label="How the security score is weighted">
+<!-- Cyber Hub score weights - Developed by Syed Muhammad Tayyab -->
+<style>text{font-family:"Segoe UI",Roboto,Arial,sans-serif}.g{transform-origin:left;animation:g 1.8s ease-out both}@keyframes g{from{transform:scaleX(0)}}</style>
+<rect width="1200" height="330" rx="20" fill="#071022"/><rect x=".5" y=".5" width="1199" height="329" rx="20" fill="none" stroke="#4f8cff" stroke-opacity=".3"/>
+<text x="40" y="48" font-size="21" font-weight="700" fill="#e8eefc">One security score · 9 weighted areas</text>
+<text x="1160" y="48" text-anchor="end" font-size="13" fill="#7f93bb">an area at risk caps the total at 59 · needs attention caps it at 89</text>
+<text x="40" y="88" font-size="14" fill="#cbd6f0">Virus &amp; threat protection</text>
+<rect x="270" y="76" width="820" height="15" rx="7.5" fill="#132446"/>
+<g transform="translate(270,76)"><rect class="g" style="animation-delay:0.00s" width="820" height="15" rx="7.5" fill="#4f8cff"/></g>
+<text x="1160" y="88.5" text-anchor="end" font-size="14" font-weight="700" fill="#4f8cff">22%</text>
+<text x="40" y="115" font-size="14" fill="#cbd6f0">Device security</text>
+<rect x="270" y="103" width="820" height="15" rx="7.5" fill="#132446"/>
+<g transform="translate(270,103)"><rect class="g" style="animation-delay:0.12s" width="596" height="15" rx="7.5" fill="#22d3ee"/></g>
+<text x="1160" y="115.5" text-anchor="end" font-size="14" font-weight="700" fill="#22d3ee">16%</text>
+<text x="40" y="142" font-size="14" fill="#cbd6f0">Firewall</text>
+<rect x="270" y="130" width="820" height="15" rx="7.5" fill="#132446"/>
+<g transform="translate(270,130)"><rect class="g" style="animation-delay:0.24s" width="447" height="15" rx="7.5" fill="#34d399"/></g>
+<text x="1160" y="142.5" text-anchor="end" font-size="14" font-weight="700" fill="#34d399">12%</text>
+<text x="40" y="169" font-size="14" fill="#cbd6f0">Network</text>
+<rect x="270" y="157" width="820" height="15" rx="7.5" fill="#132446"/>
+<g transform="translate(270,157)"><rect class="g" style="animation-delay:0.36s" width="373" height="15" rx="7.5" fill="#a78bfa"/></g>
+<text x="1160" y="169.5" text-anchor="end" font-size="14" font-weight="700" fill="#a78bfa">10%</text>
+<text x="40" y="196" font-size="14" fill="#cbd6f0">Passwords</text>
+<rect x="270" y="184" width="820" height="15" rx="7.5" fill="#132446"/>
+<g transform="translate(270,184)"><rect class="g" style="animation-delay:0.48s" width="373" height="15" rx="7.5" fill="#f472b6"/></g>
+<text x="1160" y="196.5" text-anchor="end" font-size="14" font-weight="700" fill="#f472b6">10%</text>
+<text x="40" y="223" font-size="14" fill="#cbd6f0">Accounts &amp; platforms</text>
+<rect x="270" y="211" width="820" height="15" rx="7.5" fill="#132446"/>
+<g transform="translate(270,211)"><rect class="g" style="animation-delay:0.60s" width="373" height="15" rx="7.5" fill="#fb923c"/></g>
+<text x="1160" y="223.5" text-anchor="end" font-size="14" font-weight="700" fill="#fb923c">10%</text>
+<text x="40" y="250" font-size="14" fill="#cbd6f0">Data protection</text>
+<rect x="270" y="238" width="820" height="15" rx="7.5" fill="#132446"/>
+<g transform="translate(270,238)"><rect class="g" style="animation-delay:0.72s" width="298" height="15" rx="7.5" fill="#fbbf24"/></g>
+<text x="1160" y="250.5" text-anchor="end" font-size="14" font-weight="700" fill="#fbbf24">8%</text>
+<text x="40" y="277" font-size="14" fill="#cbd6f0">Threat intelligence</text>
+<rect x="270" y="265" width="820" height="15" rx="7.5" fill="#132446"/>
+<g transform="translate(270,265)"><rect class="g" style="animation-delay:0.84s" width="261" height="15" rx="7.5" fill="#60a5fa"/></g>
+<text x="1160" y="277.5" text-anchor="end" font-size="14" font-weight="700" fill="#60a5fa">7%</text>
+<text x="40" y="304" font-size="14" fill="#cbd6f0">Websites &amp; code</text>
+<rect x="270" y="292" width="820" height="15" rx="7.5" fill="#132446"/>
+<g transform="translate(270,292)"><rect class="g" style="animation-delay:0.96s" width="186" height="15" rx="7.5" fill="#5eead4"/></g>
+<text x="1160" y="304.5" text-anchor="end" font-size="14" font-weight="700" fill="#5eead4">5%</text>
+</svg>

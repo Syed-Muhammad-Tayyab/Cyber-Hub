@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<!-- Cyber Hub - Data Protection example (Part 13) | Developed by Syed Muhammad Tayyab
+     Copy this file + cyberhub-api.js (+ auth-example.html) into ../ui/, start the engine, sign in at
+     /auth-example.html, then open http://127.0.0.1:8765/data-example.html -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cyber Hub · Data protection</title>
+<style>
+  :root{--bg:#0b1220;--card:rgba(30,58,138,.22);--line:rgba(96,165,250,.22);--txt:#e2e8f0;--mut:#94a3b8;--acc:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 "Segoe UI",system-ui,sans-serif}
+  header,footer{padding:12px 24px;color:#93c5fd;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+  footer{color:var(--mut);justify-content:center} a{color:#93c5fd}
+  h1{margin:0;font-size:20px;color:var(--txt)} h2{margin:0 0 12px;font-size:14px;color:#bfdbfe;font-weight:600}
+  main{padding:0 24px 12px;display:grid;gap:16px;grid-template-columns:repeat(12,1fr)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;backdrop-filter:blur(10px)}
+  .s12{grid-column:span 12}.s8{grid-column:span 8}.s6{grid-column:span 6}.s4{grid-column:span 4}
+  @media(max-width:1100px){.s8,.s6,.s4{grid-column:span 12}}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center} .sp{justify-content:space-between}
+  button,input,select,textarea{font:inherit;color:var(--txt);background:#0f172a;border:1px solid #334155;border-radius:8px;padding:5px 10px}
+  button{cursor:pointer;background:#1e3a8a;border-color:#1e40af} button.ghost{background:transparent;border-color:#334155}
+  button.danger{background:#7f1d1d;border-color:#991b1b} .wide{width:100%} textarea{min-height:58px;resize:vertical}
+  table{width:100%;border-collapse:collapse;font-size:13px} td,th{padding:6px 4px;text-align:left;border-bottom:1px solid #1e293b;vertical-align:top}
+  th{color:var(--mut);font-weight:500}
+  .pill{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap}
+  .ok{background:#14532d;color:#86efac}.high,.critical{background:#7f1d1d;color:#fca5a5}
+  .medium{background:#78350f;color:#fcd34d}.low{background:#1e3a5f;color:#93c5fd}.info{background:#334155;color:#cbd5e1}
+  .mut{color:var(--mut)} .mono{font-family:Consolas,monospace;font-size:12px;word-break:break-all}
+  .ring{width:140px;height:140px;flex:none}
+  .bar{height:8px;border-radius:9px;background:#1e293b;overflow:hidden;margin-top:6px} .bar i{display:block;height:100%;background:var(--acc);transition:width .3s}
+  .bars{display:flex;align-items:flex-end;gap:4px;height:90px} .bars div{flex:1;text-align:center;font-size:10px;color:var(--mut)}
+  .bars i{display:block;border-radius:4px 4px 0 0;min-height:2px;margin-bottom:4px;background:var(--acc)}
+  .warnbox{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);border-radius:10px;padding:8px 10px;font-size:12px;color:#fde68a;margin-top:8px}
+  .scroll{max-height:380px;overflow:auto} #gate{text-align:center;padding:60px}
+  #toast{position:fixed;right:20px;bottom:20px;background:#1e3a8a;border:1px solid #3b82f6;padding:12px 16px;border-radius:12px;display:none;max-width:480px;z-index:6}
+  #toast.bad{background:#450a0a;border-color:#ef4444}
+</style>
+</head>
+<body>
+<header><h1>🗄️ Cyber Hub · Data protection</h1>
+  <span>Developed by Syed Muhammad Tayyab · <a href="passwords-example.html">Passwords</a> · <a href="posture-example.html">Posture</a></span></header>
+<div id="gate" style="display:none">Sign in first at <a href="auth-example.html">auth-example.html</a>, then come back.</div>
+
+<main id="app" style="display:none">
+  <section class="card s4">
+    <h2>Data exposure score</h2>
+    <div class="row"><svg class="ring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#1e293b" stroke-width="3"/>
+      <circle id="ringArc" cx="18" cy="18" r="15.9" fill="none" stroke="#22c55e" stroke-width="3" stroke-dasharray="0 100" transform="rotate(-90 18 18)" stroke-linecap="round"/>
+      <text id="ringTxt" x="18" y="20" text-anchor="middle" fill="#e2e8f0" font-size="8">–</text></svg>
+      <div><div id="grade" style="font-size:18px;font-weight:600"></div><div id="sevs" class="mut"></div>
+        <div id="junk" class="mut" style="margin-top:6px"></div><div id="encCount" class="mut"></div></div></div>
+  </section>
+  <section class="card s8">
+    <h2>Activity (30 days)</h2>
+    <div class="bars" id="bars"></div>
+    <div class="mut" style="font-size:12px">bars = files encrypted + shredded + new sensitive files per day</div>
+  </section>
+
+  <section class="card s6">
+    <h2>Encrypt / decrypt files</h2>
+    <textarea class="wide" id="encPaths" placeholder="One file or folder path per line, e.g. C:\Users\Syed\Documents\CNIC.pdf"></textarea>
+    <div class="row" style="margin-top:8px">
+      <select id="encMode" onchange="$('#encPw').style.display = this.value === 'device' ? 'none' : ''">
+        <option value="password">Password (opens on any PC)</option><option value="device">This PC only (no password)</option></select>
+      <input id="encPw" type="password" placeholder="Password (a passphrase is best)">
+      <select id="encOrig"><option value="shred">Shred originals</option><option value="delete">Delete originals</option><option value="keep">Keep originals</option></select>
+    </div>
+    <div class="row" style="margin-top:8px"><label><input type="checkbox" id="encHide"> Hide file names</label>
+      <label><input type="checkbox" id="encVault"> Save password in my password vault</label></div>
+    <div class="row" style="margin-top:10px"><button onclick="encrypt()">Encrypt</button><button class="ghost" onclick="decrypt()">Decrypt .chx</button></div>
+    <div class="mut" style="font-size:12px;margin-top:6px">Every file is decrypted again and compared before the original is removed.</div>
+  </section>
+
+  <section class="card s6">
+    <h2>Secure shredder</h2>
+    <textarea class="wide" id="shPaths" placeholder="Files or folders to destroy permanently"></textarea>
+    <div class="row" style="margin-top:8px"><select id="shMethod"></select>
+      <button class="ghost" onclick="preview()">Preview</button><button class="danger" onclick="shred()">Shred…</button></div>
+    <div id="shPrev" class="mut" style="margin-top:8px"></div>
+  </section>
+
+  <section class="card s12">
+    <div class="row sp"><h2>Jobs</h2><span class="mut" id="liveTxt"></span></div>
+    <div id="jobs" class="mut">No jobs running.</div>
+  </section>
+
+  <section class="card s6">
+    <div class="row sp"><h2>Privacy cleaner</h2><div class="row"><button class="ghost" onclick="analyze()">Analyze</button>
+      <button onclick="clean()">Clean selected</button></div></div>
+    <div class="mut" id="cleanTs"></div>
+    <div class="scroll"><table><thead><tr><th></th><th>What</th><th>Size</th><th></th></tr></thead><tbody id="cats"></tbody></table></div>
+  </section>
+
+  <section class="card s6">
+    <div class="row sp"><h2>Sensitive files</h2><button onclick="findFiles()">Search my folders</button></div>
+    <div class="mut" id="roots"></div>
+    <div class="scroll"><table><thead><tr><th>File</th><th>Found</th><th></th></tr></thead><tbody id="finds"></tbody></table></div>
+  </section>
+</main>
+<div id="toast"></div>
+<footer>Cyber Hub · Part 13 Data Protection · Developed by Syed Muhammad Tayyab</footer>
+
+<script src="cyberhub-api.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const pill = (t, cls) => `<span class="pill ${cls}">${esc(t)}</span>`;
+const lines = s => $(s).value.split(/\n/).map(x => x.trim()).filter(Boolean);
+const size = n => { const u = ["B", "KB", "MB", "GB", "TB"]; let i = 0; while (n >= 1024 && i < 4) { n /= 1024; i++; } return (i ? n.toFixed(1) : n) + " " + u[i]; };
+function toast(msg, bad) { const t = $("#toast"); t.textContent = msg; t.className = bad ? "bad" : ""; t.style.display = "block";
+  clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 7000); }
+
+async function load() {
+  try { await CyberHub.me(); } catch (e) { $("#gate").style.display = "block"; return; }
+  $("#app").style.display = "grid";
+  const [st, sm, rep, fs] = await Promise.all([CyberHub.dataStatus(), CyberHub.dataSummary(30), CyberHub.privacyReport(),
+                                                CyberHub.sensitiveFindings()]);
+  const h = st.health, col = h.score >= 90 ? "#22c55e" : h.score >= 75 ? "#3b82f6" : h.score >= 50 ? "#f59e0b" : "#ef4444";
+  $("#ringArc").setAttribute("stroke-dasharray", `${h.score} 100`); $("#ringArc").setAttribute("stroke", col);
+  $("#ringTxt").textContent = h.score; $("#grade").textContent = h.searched ? h.grade : "Search your folders";
+  $("#sevs").innerHTML = ["critical", "high", "medium", "low"].map(s => h.by_severity[s] ? pill(`${h.by_severity[s]} ${s}`, s) : "").join(" ") || "No open findings";
+  $("#junk").textContent = h.cleaner_analyzed_at ? `${h.junk_size} of junk & traces` : "Privacy cleaner not run yet";
+  $("#encCount").textContent = `${h.encrypted_files} encrypted file(s)`;
+  const max = Math.max(1, ...sm.per_day.map(d => d.encrypted_files + d.shredded_files + d.findings_new));
+  $("#bars").innerHTML = sm.per_day.map(d => { const v = d.encrypted_files + d.shredded_files + d.findings_new;
+    return `<div title="${d.day}: ${v}"><i style="height:${v * 80 / max}px"></i>${d.day.slice(8)}</div>`; }).join("");
+  $("#shMethod").innerHTML = Object.entries(st.shredder.methods).map(([k, v]) => `<option value="${k}" ${k === st.shredder.method ? "selected" : ""}>${esc(v)}</option>`).join("");
+  $("#cleanTs").textContent = rep.ts ? `Analyzed ${new Date(rep.ts).toLocaleString()} · ${size(rep.total_bytes)} found` : "Click Analyze to measure.";
+  $("#cats").innerHTML = rep.categories.map(c => `<tr><td><input type="checkbox" class="cat" value="${c.id}" ${c.browser_running || c.needs_confirm ? "" : "checked"}></td>
+    <td><b>${esc(c.label)}</b><div class="mut" style="font-size:12px">${esc(c.description)}${c.warning ? " · ⚠ " + esc(c.warning) : ""}</div></td>
+    <td>${c.action_only ? "–" : size(c.bytes)}</td><td>${c.browser_running ? pill(c.note, "medium") : ""}</td></tr>`).join("");
+  $("#roots").textContent = "Searching: " + st.finder.roots.map(r => r.label).join(", ");
+  $("#finds").innerHTML = fs.items.map(f => `<tr><td><b>${esc(f.name)}</b><div class="mono mut">${esc(f.folder)}</div></td>
+    <td>${f.types.map(t => pill(`${t.label} ×${t.count}`, t.severity) + `<div class="mut" style="font-size:11px">${esc(t.samples.join(" · "))}</div>`).join("")}</td>
+    <td class="row"><button onclick="encFind(${f.id})">Encrypt</button><button class="danger" onclick="shredFind(${f.id})">Shred</button>
+      <button class="ghost" onclick="CyberHub.ignoreFinding(${f.id}).then(load)">It's fine</button></td></tr>`).join("")
+    || `<tr><td colspan="3" class="mut">${st.finder.last_search ? "Nothing sensitive found 🎉" : "Not searched yet."}</td></tr>`;
+}
+
+async function run(p, label) {
+  try { const j = await p; toast(`${label} started`); return j; } catch (e) { toast(e.message, true); }
+}
+async function encrypt() {
+  const paths = lines("#encPaths"); if (!paths.length) return toast("Add at least one path", true);
+  let r;
+  try { r = await CyberHub.encryptFiles(paths, { mode: $("#encMode").value, password: $("#encPw").value || null,
+      deleteOriginal: $("#encOrig").value, hideNames: $("#encHide").checked, saveToVault: $("#encVault").checked }); }
+  catch (e) {
+    if (e.status === 422 && /allow_weak/.test(e.message) && confirm(e.message + "\n\nUse it anyway?"))
+      r = await CyberHub.encryptFiles(paths, { password: $("#encPw").value, allowWeak: true, deleteOriginal: $("#encOrig").value });
+    else return toast(e.message, true);
+  }
+  $("#encPw").value = ""; toast("Encrypting…");
+}
+async function decrypt() {
+  const paths = lines("#encPaths"); if (!paths.length) return toast("Add the .chx files or folders", true);
+  run(CyberHub.decryptFiles(paths, { password: $("#encPw").value || null }), "Decryption");
+}
+async function preview() {
+  try { const p = await CyberHub.shredPreview(lines("#shPaths"));
+    $("#shPrev").innerHTML = `${p.files} file(s), ${p.folders} folder(s) · ${p.size} · drive: ${p.media.join(", ")}` +
+      p.warnings.map(w => `<div class="warnbox">${esc(w)}</div>`).join(""); return p;
+  } catch (e) { toast(e.message, true); }
+}
+async function shred() {
+  const p = await preview(); if (!p) return;
+  if (!confirm(`Permanently destroy ${p.files} file(s) (${p.size})? This can't be undone.`)) return;
+  run(CyberHub.shredFiles(lines("#shPaths"), { method: $("#shMethod").value, confirm: true }), "Shredding");
+}
+async function analyze() { run(CyberHub.analyzePrivacy(), "Analysis"); }
+async function clean() {
+  const ids = [...document.querySelectorAll(".cat:checked")].map(x => x.value); if (!ids.length) return toast("Tick something to clean", true);
+  try { await CyberHub.cleanPrivacy(ids); toast("Cleaning…"); }
+  catch (e) { if (e.status === 428 && confirm(e.message.replace(" - send again with confirm=true", "") + "\n\nContinue?"))
+      run(CyberHub.cleanPrivacy(ids, { confirm: true }), "Cleaning"); else toast(e.message, true); }
+}
+async function findFiles() { run(CyberHub.findSensitiveFiles(), "Search"); }
+async function encFind(id) {
+  const pw = prompt("Password for this file (it will be encrypted and the original shredded)"); if (!pw) return;
+  run(CyberHub.encryptFinding(id, { password: pw }), "Encryption");
+}
+async function shredFind(id) { if (confirm("Shred this file permanently?")) run(CyberHub.shredFinding(id, true), "Shredding"); }
+
+const KIND = { encrypt: "Encrypting", decrypt: "Decrypting", shred: "Shredding", clean: "Cleaning", cleaner_analyze: "Analyzing", finder: "Searching" };
+let wasRunning = 0;
+function startStream() {
+  CyberHub.streamData(({ jobs, events, unacknowledged }) => {
+    $("#liveTxt").textContent = `live · ${unacknowledged} unread alert(s)`;
+    $("#jobs").innerHTML = jobs.length ? jobs.map(j => `<div style="margin-bottom:8px"><div class="row sp"><span><b>${KIND[j.kind] || j.kind}</b>
+      <span class="mut">${esc(j.progress.current || j.progress.phase)} · ${j.progress.files_done}/${j.progress.files_total}</span></span>
+      <button class="ghost" onclick="CyberHub.cancelDataJob('${j.id}')">Cancel</button></div>
+      <div class="bar"><i style="width:${j.progress.percent}%"></i></div></div>`).join("") : "No jobs running.";
+    events.forEach(e => toast(e.title + (e.detail ? " · " + e.detail : ""), ["high", "critical"].includes(e.severity)));
+    if (wasRunning && !jobs.length) load();
+    wasRunning = jobs.length;
+  }, { onClose: () => setTimeout(startStream, 3000) });
+}
+load().then(startStream);
+</script>
+</body>
+</html>

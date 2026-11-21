@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<!-- Cyber Hub - Live System Monitor example (Part 3) | Developed by Syed Muhammad Tayyab
+     Copy this file + cyberhub-api.js (+ auth-example.html) into ../ui/, start the engine,
+     sign in at /auth-example.html, then open http://127.0.0.1:8765/monitor-example.html -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cyber Hub · Live Monitor</title>
+<style>
+  :root{--bg:#0b1220;--card:rgba(30,58,138,.22);--line:rgba(96,165,250,.22);--txt:#e2e8f0;--mut:#94a3b8;--acc:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--crit:#ef4444}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 "Segoe UI",system-ui,sans-serif}
+  header,footer{padding:12px 24px;color:#93c5fd;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+  footer{color:var(--mut);justify-content:center}
+  h1{margin:0;font-size:20px;color:var(--txt)} h2{margin:0 0 12px;font-size:14px;color:#bfdbfe;font-weight:600}
+  main{padding:0 24px 12px;display:grid;gap:16px;grid-template-columns:repeat(12,1fr)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;backdrop-filter:blur(10px)}
+  .s12{grid-column:span 12}.s8{grid-column:span 8}.s6{grid-column:span 6}.s4{grid-column:span 4}
+  @media(max-width:1000px){.s8,.s6,.s4{grid-column:span 12}}
+  .rings{display:flex;justify-content:space-around;flex-wrap:wrap;gap:12px}
+  .ring{text-align:center;width:118px} .ring svg{width:110px;height:110px;transform:rotate(-90deg)}
+  .ring circle{fill:none;stroke-width:10} .ring .bg{stroke:#1e293b} .ring .fg{stroke-linecap:round;transition:stroke-dashoffset .6s,stroke .3s}
+  .ring b{display:block;margin-top:-72px;height:62px;font-size:20px} .ring span{color:var(--mut);font-size:12px}
+  .cores{display:flex;gap:4px;align-items:flex-end;height:120px}
+  .cores div{flex:1;background:linear-gradient(to top,#1d4ed8,#60a5fa);border-radius:4px 4px 0 0;min-height:2px;transition:height .5s}
+  .kv{display:grid;grid-template-columns:1fr auto;gap:6px 12px} .kv span{color:var(--mut)}
+  table{width:100%;border-collapse:collapse} td,th{padding:6px 4px;text-align:left;border-bottom:1px solid #1e293b} th{color:var(--mut);font-weight:500}
+  .pill{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600}
+  .ok{background:#14532d;color:#86efac}.warning,.medium{background:#78350f;color:#fcd34d}.critical,.high{background:#7f1d1d;color:#fca5a5}.unknown{background:#1e293b;color:var(--mut)}
+  button,input{font:inherit;color:var(--txt);background:#0f172a;border:1px solid #334155;border-radius:8px;padding:5px 10px}
+  button{cursor:pointer;background:#1e3a8a;border-color:#1e40af} input{width:70px}
+  canvas{width:100%;height:120px} .mut{color:var(--mut)} #gate{text-align:center;padding:60px}
+</style>
+</head>
+<body>
+<header><h1>🛡️ Cyber Hub · Live System Monitor</h1><span>Developed by Syed Muhammad Tayyab · <span id="overall" class="pill unknown">…</span></span></header>
+
+<div id="gate" style="display:none">Sign in first at <a href="auth-example.html" style="color:#93c5fd">auth-example.html</a>, then come back.</div>
+
+<main id="app" style="display:none">
+  <section class="card s12"><div class="rings" id="rings"></div></section>
+
+  <section class="card s8"><h2>CPU usage · last 2 minutes</h2><canvas id="chart" width="900" height="120"></canvas></section>
+  <section class="card s4"><h2>Per-core load</h2><div class="cores" id="cores"></div><p class="mut" id="freq"></p></section>
+
+  <section class="card s4"><h2>Disk & network</h2><div class="kv" id="io"></div></section>
+  <section class="card s4"><h2>Memory</h2><div class="kv" id="mem"></div></section>
+  <section class="card s4"><h2>Sensors</h2><div class="kv" id="sensors"></div><p class="mut" id="sensorNote"></p></section>
+
+  <section class="card s6"><h2>Top CPU users</h2><table><thead><tr><th>Process</th><th>PID</th><th>CPU</th><th>RAM</th></tr></thead><tbody id="top"></tbody></table></section>
+  <section class="card s6"><h2>Alerts <button id="ackAll" style="float:right">Acknowledge all</button></h2>
+    <table><tbody id="alerts"></tbody></table>
+    <h2 style="margin-top:16px">Thresholds</h2><form id="th" class="kv"></form></section>
+</main>
+<footer>Cyber Hub · Developed by Syed Muhammad Tayyab</footer>
+
+<script src="cyberhub-api.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const RINGS = [["cpu","CPU"],["memory","Memory"],["disk_space","Disk space"],["gpu","GPU"],["temperature","CPU °C"]];
+const COLOR = {ok:"#22c55e",warning:"#f59e0b",critical:"#ef4444",unknown:"#475569"};
+const C = 2 * Math.PI * 45, cpuHist = [];
+
+$("rings").innerHTML = RINGS.map(([k, l]) => `<div class="ring"><svg viewBox="0 0 110 110"><circle class="bg" cx="55" cy="55" r="45"/>
+  <circle class="fg" id="r_${k}" cx="55" cy="55" r="45" stroke-dasharray="${C}" stroke-dashoffset="${C}"/></svg>
+  <b id="v_${k}">–</b><span>${l}</span></div>`).join("");
+
+function setRing(key, h) {
+  const v = h.value, max = key === "temperature" ? 110 : 100;
+  $("r_" + key).style.strokeDashoffset = v == null ? C : C * (1 - Math.min(v, max) / max);
+  $("r_" + key).style.stroke = COLOR[h.status];
+  $("v_" + key).textContent = v == null ? "n/a" : Math.round(v) + (key === "temperature" ? "°" : "%");
+}
+const kv = rows => rows.map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join("");
+
+function drawChart() {
+  const cv = $("chart"), g = cv.getContext("2d"), w = cv.width, h = cv.height;
+  g.clearRect(0, 0, w, h); g.strokeStyle = "#1e293b";
+  for (let y = 0; y <= 4; y++) { g.beginPath(); g.moveTo(0, y * h / 4); g.lineTo(w, y * h / 4); g.stroke(); }
+  if (cpuHist.length < 2) return;
+  const step = w / 59, pts = cpuHist.map((v, i) => [w - (cpuHist.length - 1 - i) * step, h - v / 100 * h]);
+  const grad = g.createLinearGradient(0, 0, 0, h); grad.addColorStop(0, "rgba(59,130,246,.45)"); grad.addColorStop(1, "rgba(59,130,246,0)");
+  g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y));
+  g.lineTo(pts.at(-1)[0], h); g.lineTo(pts[0][0], h); g.fillStyle = grad; g.fill();
+  g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.strokeStyle = "#60a5fa"; g.lineWidth = 2; g.stroke();
+}
+
+function onFrame(f) {
+  RINGS.forEach(([k]) => setRing(k, f.health[k]));
+  $("overall").textContent = f.health.overall.toUpperCase(); $("overall").className = "pill " + f.health.overall;
+  $("cores").innerHTML = f.cpu.per_core.map((v, i) => `<div title="Core ${i}: ${v}%" style="height:${Math.max(v, 1)}%"></div>`).join("");
+  $("freq").textContent = f.cpu.frequency_mhz ? `${f.cpu.per_core.length} logical cores · ${f.cpu.frequency_mhz} MHz` : "";
+  cpuHist.push(f.cpu.percent); if (cpuHist.length > 60) cpuHist.shift(); drawChart();
+  $("io").innerHTML = kv([["Disk read", f.disk_io.read_mb_s + " MB/s"], ["Disk write", f.disk_io.write_mb_s + " MB/s"],
+    ["IOPS (r/w)", `${Math.round(f.disk_io.read_iops)} / ${Math.round(f.disk_io.write_iops)}`],
+    ["Upload", f.network.upload_kbps + " KB/s"], ["Download", f.network.download_kbps + " KB/s"]]);
+  $("mem").innerHTML = kv([["Used", f.memory.used_gb + " GB"], ["Available", f.memory.available_gb + " GB"],
+    ["Total", f.memory.total_gb + " GB"], ["Page file / swap", f.memory.swap_percent + " %"]]);
+  $("top").innerHTML = f.top_cpu.map(p => `<tr><td>${p.name}</td><td>${p.pid}</td><td>${p.cpu_percent}%</td><td>${p.memory_mb} MB</td></tr>`).join("");
+  if (f.active_alerts !== lastAlertCount) { lastAlertCount = f.active_alerts; loadAlerts(); }
+}
+let lastAlertCount = -1;
+
+async function loadAlerts() {
+  const { items } = await CyberHub.monitorAlerts("all", 8);
+  $("alerts").innerHTML = items.length ? items.map(a => `<tr><td><span class="pill ${a.status === "active" ? a.severity : "ok"}">${a.status === "active" ? a.severity : "resolved"}</span></td>
+    <td>${a.message}<br><small class="mut">${new Date(a.started_at).toLocaleString()}</small></td>
+    <td>${a.acknowledged_at ? "✓" : `<button onclick="CyberHub.ackAlert(${a.id}).then(loadAlerts)">Ack</button>`}</td></tr>`).join("")
+    : `<tr><td class="mut">No alerts — all resources within limits.</td></tr>`;
+}
+
+async function loadStatic() {
+  const t = await CyberHub.temperatures(), g = await CyberHub.gpu();
+  $("sensors").innerHTML = kv([["CPU temp", t.cpu_celsius != null ? t.cpu_celsius + " °C" : "n/a"],
+    ["GPU", g.gpus[0] ? g.gpus[0].name : "n/a"], ["GPU temp", t.gpu_celsius != null ? t.gpu_celsius + " °C" : "n/a"],
+    ["Fans", t.fans.length ? t.fans.map(f => f.rpm + " rpm").join(", ") : "n/a"]]);
+  $("sensorNote").textContent = t.note || g.note || "";
+  const th = await CyberHub.getThresholds();
+  const F = [["alert_cpu_percent","CPU %"],["alert_memory_percent","Memory %"],["alert_disk_percent","Disk %"],
+             ["alert_gpu_percent","GPU %"],["alert_temperature_c","Temp °C"],["alert_sustain_seconds","Sustain (s)"]];
+  $("th").innerHTML = F.map(([k, l]) => `<span>${l}</span><input name="${k}" type="number" value="${th[k]}">`).join("") + `<span></span><button>Save</button>`;
+}
+$("th").onsubmit = async e => {
+  e.preventDefault();
+  const body = Object.fromEntries([...new FormData(e.target)].map(([k, v]) => [k, Number(v)]));
+  try { await CyberHub.setThresholds(body); alert("Thresholds saved"); } catch (err) { alert(err.message); }
+};
+$("ackAll").onclick = () => CyberHub.ackAllAlerts().then(loadAlerts);
+window.addEventListener("cyberhub:locked", () => location.href = "auth-example.html");
+window.addEventListener("cyberhub:signedout", () => location.href = "auth-example.html");
+
+(async () => {
+  if (!CyberHub.isSignedIn()) { $("gate").style.display = "block"; return; }
+  $("app").style.display = "grid";
+  await loadStatic(); loadAlerts();
+  CyberHub.streamMonitor(onFrame, { top: 6, onClose: () => setTimeout(() => location.reload(), 3000) });
+})();
+</script>
+</body>
+</html>

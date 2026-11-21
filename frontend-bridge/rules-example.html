@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<!-- Cyber Hub - Rules engine, heuristics & online lookup example (Part 8) | Developed by Syed Muhammad Tayyab
+     Copy this file + cyberhub-api.js (+ auth-example.html) into ../ui/, start the engine,
+     sign in at /auth-example.html, then open http://127.0.0.1:8765/rules-example.html -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cyber Hub · Rules & heuristics</title>
+<style>
+  :root{--bg:#0b1220;--card:rgba(30,58,138,.22);--line:rgba(96,165,250,.22);--txt:#e2e8f0;--mut:#94a3b8;--acc:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--y:#a78bfa;--h:#f59e0b;--c:#38bdf8}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 "Segoe UI",system-ui,sans-serif}
+  header,footer{padding:12px 24px;color:#93c5fd;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+  footer{color:var(--mut);justify-content:center} a{color:#93c5fd}
+  h1{margin:0;font-size:20px;color:var(--txt)} h2{margin:0 0 12px;font-size:14px;color:#bfdbfe;font-weight:600}
+  main{padding:0 24px 12px;display:grid;gap:16px;grid-template-columns:repeat(12,1fr)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;backdrop-filter:blur(10px)}
+  .s12{grid-column:span 12}.s8{grid-column:span 8}.s7{grid-column:span 7}.s6{grid-column:span 6}.s5{grid-column:span 5}.s4{grid-column:span 4}
+  @media(max-width:1100px){.s8,.s7,.s6,.s5,.s4{grid-column:span 12}}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center} .sp{justify-content:space-between}
+  .stat b{display:block;font-size:26px} .stat span{color:var(--mut);font-size:12px}
+  button,input,select,textarea{font:inherit;color:var(--txt);background:#0f172a;border:1px solid #334155;border-radius:8px;padding:5px 10px}
+  button{cursor:pointer;background:#1e3a8a;border-color:#1e40af} button.danger{background:#7f1d1d;border-color:#991b1b}
+  textarea{width:100%;min-height:170px;font-family:Consolas,monospace;font-size:12px}
+  .switch{width:46px;height:24px;border-radius:99px;background:#334155;position:relative;cursor:pointer;flex:none;border:none;padding:0}
+  .switch i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s}
+  .switch.on{background:var(--ok)} .switch.on i{left:25px}
+  table{width:100%;border-collapse:collapse;font-size:13px} td,th{padding:6px 4px;text-align:left;border-bottom:1px solid #1e293b;vertical-align:top}
+  th{color:var(--mut);font-weight:500}
+  .pill{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap}
+  .ok,.clean,.low{background:#14532d;color:#86efac}.error,.malicious,.high,.critical{background:#7f1d1d;color:#fca5a5}
+  .unsupported,.medium,.suspicious{background:#78350f;color:#fcd34d}.disabled,.unknown,.info{background:#334155;color:#cbd5e1}
+  .yara{background:rgba(167,139,250,.2);color:#c4b5fd}.heuristic{background:rgba(245,158,11,.2);color:#fcd34d}.cloud{background:rgba(56,189,248,.2);color:#7dd3fc}
+  .mut{color:var(--mut)} .mono{font-family:Consolas,monospace;font-size:12px;word-break:break-all}
+  .drop{border:2px dashed var(--line);border-radius:14px;padding:22px;text-align:center;color:var(--mut);cursor:pointer}
+  .drop.over{border-color:var(--acc);background:rgba(59,130,246,.08)}
+  .ring{width:120px;height:120px;flex:none} .verdict{font-size:18px;font-weight:600}
+  .flag{display:grid;grid-template-columns:1fr 60px;gap:8px;align-items:center;margin:4px 0;font-size:12px}
+  .bar{height:8px;border-radius:4px;background:#1e293b;overflow:hidden} .bar i{display:block;height:100%}
+  .bars{display:flex;align-items:flex-end;gap:4px;height:120px} .bars .d{flex:1;display:flex;flex-direction:column-reverse;height:100%}
+  .bars .d i{display:block;border-radius:2px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 10px}
+  .scroll{max-height:360px;overflow:auto} #gate{text-align:center;padding:60px}
+  #toast{position:fixed;right:20px;bottom:20px;background:#1e3a8a;border:1px solid #3b82f6;padding:12px 16px;border-radius:12px;display:none;max-width:420px;z-index:6}
+  #toast.bad{background:#450a0a;border-color:#ef4444}
+  details summary{cursor:pointer;color:#bfdbfe}
+</style>
+</head>
+<body>
+<header><h1>🧬 Cyber Hub · Rules engine & heuristics</h1>
+  <span>Developed by Syed Muhammad Tayyab · <a href="scanner-example.html">Scanner</a> · <a href="realtime-example.html">Real-time</a> · <a href="quarantine-example.html">Quarantine</a></span></header>
+<div id="gate" style="display:none">Sign in first at <a href="auth-example.html">auth-example.html</a>, then come back.</div>
+
+<main id="app" style="display:none">
+  <!-- engine status -->
+  <section class="card s8">
+    <div class="row sp"><h2 style="margin:0">Detection engines</h2><span class="mut" id="backend"></span></div>
+    <div class="row sp" style="margin-top:12px">
+      <div class="stat"><b id="nRules">–</b><span>YARA rules active</span></div>
+      <div class="stat"><b id="nSets">–</b><span>rule sets</span></div>
+      <div class="stat"><b id="nY" style="color:var(--y)">0</b><span>found by rules</span></div>
+      <div class="stat"><b id="nH" style="color:var(--h)">0</b><span>found by heuristics</span></div>
+      <div class="stat"><b id="nC" style="color:var(--c)">0</b><span>found online</span></div>
+      <div class="stat"><b id="nCache">0</b><span>verdicts remembered</span></div>
+    </div>
+    <div class="row" style="margin-top:14px;gap:18px">
+      <span class="row">YARA rules <button class="switch" id="swY" onclick="setting('yara_enabled', !this.classList.contains('on'))"><i></i></button></span>
+      <span class="row">Heuristics <button class="switch" id="swH" onclick="setting('heuristics_enabled', !this.classList.contains('on'))"><i></i></button></span>
+      <span class="row">Sensitivity
+        <select id="sens" onchange="setting('heuristics_sensitivity', this.value)">
+          <option value="low">Low (score 80+)</option><option value="medium">Medium (60+)</option><option value="high">High (45+)</option></select></span>
+      <span class="row">Auto-quarantine heuristic finds <button class="switch" id="swHQ" onclick="setting('heuristics_auto_quarantine', !this.classList.contains('on'))"><i></i></button></span>
+      <button onclick="selfTest()">Self-test</button>
+    </div>
+  </section>
+  <section class="card s4">
+    <h2>Detections by engine · last 30 days</h2>
+    <div class="bars" id="chart"></div>
+    <div class="legend mut" style="font-size:11px;margin-top:6px"><i style="background:var(--y)"></i>YARA<i style="background:var(--h)"></i>Heuristics<i style="background:var(--c)"></i>Online</div>
+  </section>
+
+  <!-- analyze -->
+  <section class="card s7">
+    <h2>Analyse a file</h2>
+    <div class="drop" id="drop">Drop a file here or click to choose (max 20 MB, analysed locally, nothing is recorded)
+      <input type="file" id="pick" style="display:none"></div>
+    <div class="row" style="margin-top:8px"><input id="apath" placeholder="…or a full path on this PC, e.g. C:\Users\you\Downloads\setup.exe" style="flex:1">
+      <button onclick="analyzePath()">Analyse</button></div>
+    <div id="report" style="margin-top:14px"></div>
+  </section>
+
+  <!-- online lookup -->
+  <section class="card s5">
+    <div class="row sp"><h2 style="margin:0">Online hash lookup</h2>
+      <button class="switch" id="swCloud" onclick="setting('cloud_lookup_enabled', !this.classList.contains('on'))"><i></i></button></div>
+    <div class="mut" style="font-size:12px;margin:6px 0 10px" id="privacy"></div>
+    <div id="providers"></div>
+    <div class="row" style="margin-top:8px">
+      <input id="vtKey" type="password" placeholder="VirusTotal API key" style="flex:1">
+      <input id="mbKey" type="password" placeholder="MalwareBazaar Auth-Key" style="flex:1">
+      <button onclick="saveKeys()">Save keys</button></div>
+    <div class="row" style="margin-top:8px">Background check of clean files
+      <select id="auto" onchange="setting('cloud_auto_lookup', this.value)"><option value="off">off</option><option value="executables">programs & scripts</option><option value="all">all files</option></select>
+      <span class="mut" id="queue"></span></div>
+    <div class="row" style="margin-top:12px"><input id="hash" placeholder="MD5 / SHA-1 / SHA-256" style="flex:1" class="mono"><button onclick="lookup()">Look up</button></div>
+    <div id="lookupRes" style="margin-top:10px"></div>
+  </section>
+
+  <!-- rule sets -->
+  <section class="card s7">
+    <div class="row sp"><h2 style="margin:0">YARA rule sets</h2>
+      <span class="row"><input id="ipath" placeholder="Import .yar / folder / .zip path"><button onclick="importRules()">Import</button></span></div>
+    <div class="scroll" style="margin-top:10px"><table><thead><tr><th>Name</th><th>Rules</th><th>Status</th><th>Hits</th><th>On</th><th></th></tr></thead>
+      <tbody id="sets"></tbody></table></div>
+  </section>
+  <section class="card s5">
+    <h2>Add your own rules</h2>
+    <input id="rname" placeholder="Rule set name" style="width:100%;margin-bottom:8px">
+    <textarea id="rsrc" spellcheck="false">rule My_IOC
+{
+    meta:
+        threat_name = "Trojan:Custom/MyIOC"
+        severity = "high"
+        description = "Indicator from my incident report"
+    strings:
+        $a = "evil-domain.example" nocase ascii wide
+    condition:
+        $a
+}</textarea>
+    <div class="row sp" style="margin-top:8px"><span id="valid" class="mut"></span><button onclick="saveRules()">Save rule set</button></div>
+  </section>
+
+  <!-- detections -->
+  <section class="card s12">
+    <div class="row sp"><h2 style="margin:0">Found by rules, heuristics & online lookup</h2>
+      <select id="dm" onchange="loadDetections()"><option value="all">all engines</option><option value="yara">YARA</option><option value="heuristic">heuristics</option><option value="cloud">online</option></select></div>
+    <div class="scroll" style="margin-top:10px"><table><thead><tr><th>When</th><th>Engine</th><th>Threat</th><th>Severity</th><th>File</th><th>Why</th><th>Status</th></tr></thead>
+      <tbody id="dets"></tbody></table></div>
+  </section>
+</main>
+<footer>Cyber Hub · Rules engine, heuristics & hash lookup (Part 8 of 20) · Developed by Syed Muhammad Tayyab</footer>
+<div id="toast"></div>
+<script src="cyberhub-api.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pill = (t, cls) => `<span class="pill ${esc(cls || t)}">${esc(t)}</span>`;
+function toast(msg, bad) { const t = $("toast"); t.textContent = msg; t.className = bad ? "bad" : ""; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 4500); }
+async function act(p, ok) { try { const r = await p; if (ok) toast(ok); await refresh(); return r; } catch (e) { toast(e.message, true); } }
+const sw = (id, on) => $(id).classList.toggle("on", !!on);
+
+async function setting(key, value) { await act(CyberHub.updateSettings({ [key]: value }), "Saved"); }
+
+async function refresh() {
+  const [st, sum, lk] = await Promise.all([CyberHub.rulesStatus(), CyberHub.rulesSummary(30), CyberHub.lookupStatus()]);
+  $("backend").textContent = st.backend.label + (st.backend.name === "lite" ? " · install yara-python for modules" : "");
+  $("nRules").textContent = st.active_rules; $("nSets").textContent = st.active_sets; $("nCache").textContent = st.verdict_cache;
+  const tot = m => Object.values(st.detections[m] || {}).reduce((a, b) => a + b, 0);
+  $("nY").textContent = tot("yara"); $("nH").textContent = tot("heuristic"); $("nC").textContent = tot("cloud");
+  sw("swY", st.settings.yara_enabled); sw("swH", st.settings.heuristics_enabled); sw("swHQ", st.settings.heuristics_auto_quarantine);
+  $("sens").value = st.settings.heuristics_sensitivity;
+  drawChart(sum.per_day);
+  sw("swCloud", lk.enabled); $("auto").value = lk.auto_lookup; $("privacy").textContent = lk.privacy;
+  $("queue").textContent = lk.queue ? `${lk.queue} waiting` : "";
+  $("providers").innerHTML = Object.values(lk.providers).map(p => `<div class="row sp" style="font-size:12px;margin:4px 0">
+     <span>${esc(p.label)} ${p.key_set ? pill("key " + p.key_hint, "ok") : `<a href="${esc(p.get_key_at)}" target="_blank">get a free key</a>`}</span>
+     <span class="mut">${p.requests_today}/${p.daily_limit} today${p.paused_seconds ? " · paused " + p.paused_seconds + " s" : ""}</span></div>`).join("");
+  loadSets(); loadDetections();
+}
+
+function drawChart(rows) {
+  const days = [...new Set(rows.map(r => r.day))].slice(-30);
+  const by = {}; rows.forEach(r => (by[r.day] ||= {})[r.method] = r.n);
+  const max = Math.max(1, ...days.map(d => Object.values(by[d]).reduce((a, b) => a + b, 0)));
+  $("chart").innerHTML = days.length ? days.map(d => `<div class="d" title="${d}">` +
+    [["yara", "var(--y)"], ["heuristic", "var(--h)"], ["cloud", "var(--c)"]].map(([m, c]) =>
+      by[d][m] ? `<i style="height:${by[d][m] * 100 / max}%;background:${c}"></i>` : "").join("") + "</div>").join("")
+    : `<div class="mut" style="margin:auto">Nothing found yet - that's good news.</div>`;
+}
+
+async function loadSets() {
+  const { items } = await CyberHub.ruleSets();
+  $("sets").innerHTML = items.map(s => `<tr>
+    <td>${esc(s.name)}<div class="mut" style="font-size:11px">${esc(s.origin)}${s.error ? " · " + esc(s.error) : ""}</div></td>
+    <td>${s.rule_count}</td><td>${pill(s.enabled ? s.status : "disabled")}</td><td>${s.detections || 0}</td>
+    <td><button class="switch ${s.enabled ? "on" : ""}" onclick="act(CyberHub.updateRuleSet(${s.id}, {enabled: ${!s.enabled}}))"><i></i></button></td>
+    <td>${s.origin === "builtin" ? "" : `<button class="danger" onclick="if(confirm('Delete ${esc(s.name)}?'))act(CyberHub.deleteRuleSet(${s.id}),'Deleted')">✕</button>`}</td></tr>`).join("");
+}
+
+async function loadDetections() {
+  const { items } = await CyberHub.ruleDetections({ method: $("dm").value, limit: 100 });
+  $("dets").innerHTML = items.map(d => {
+    const x = d.details || {};
+    const why = d.method === "yara" ? `rule <b>${esc(x.rule)}</b> (${esc(x.set)})`
+      : d.method === "heuristic" ? `score ${x.score}/${x.threshold}: ` + (x.flags || []).filter(f => f.weight > 0).map(f => esc(f.description)).join("; ")
+      : Object.entries(x.providers || {}).map(([p, r]) => `${esc(p)}: ${r.malicious ?? "?"}/${r.total ?? "?"}`).join(", ");
+    return `<tr><td class="mut">${esc(d.detected_at.slice(0, 16).replace("T", " "))}</td><td>${pill(d.method)}</td>
+      <td>${esc(d.threat_name)}</td><td>${pill(d.severity)}</td>
+      <td class="mono">${esc(d.path)}${d.archive_member ? " › " + esc(d.archive_member) : ""}</td><td style="font-size:12px">${why}</td><td>${pill(d.status, "info")}</td></tr>`;
+  }).join("") || `<tr><td colspan="7" class="mut">No detections.</td></tr>`;
+}
+
+// ---------- analyze
+function ring(score, threshold) {
+  const c = 2 * Math.PI * 50, col = score >= threshold ? "#ef4444" : score >= 30 ? "#f59e0b" : "#22c55e";
+  return `<svg class="ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="#1e293b" stroke-width="12"/>
+    <circle cx="60" cy="60" r="50" fill="none" stroke="${col}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${c * score / 100} ${c}" transform="rotate(-90 60 60)"/>
+    <text x="60" y="58" text-anchor="middle" fill="#e2e8f0" font-size="26" font-weight="700">${score}</text>
+    <text x="60" y="78" text-anchor="middle" fill="#94a3b8" font-size="11">suspicion</text></svg>`;
+}
+function showReport(r) {
+  const v = r.verdict, h = r.heuristics;
+  let html = `<div class="row" style="gap:18px">${ring(h.score, h.threshold)}<div>
+    <div class="verdict" style="color:${v ? "#fca5a5" : "#86efac"}">${v ? "⚠ " + esc(v.threat_name) : "✓ Nothing suspicious found"}</div>
+    <div class="mut">${esc(r.name)} · ${esc(r.file_type)} · ${(r.size / 1024).toFixed(1)} KB · entropy ${r.entropy}${r.partial ? " · large file: name/header checks only" : ""}</div>
+    ${v ? `<div style="margin-top:4px">${pill(v.method)} ${pill(v.severity)}</div>` : ""}
+    <div class="mono mut" style="margin-top:6px">SHA-256 ${esc(r.sha256)}</div>
+    <div class="row" style="margin-top:6px"><button onclick="$('hash').value='${r.sha256}';lookup()">Look up online</button></div></div></div>`;
+  if (r.yara.matches.length) html += `<h2 style="margin-top:14px">YARA matches</h2>` + r.yara.matches.map(m =>
+    `<div style="margin-bottom:8px">${pill(m.severity)} <b>${esc(m.rule)}</b> <span class="mut">(${esc(m.set)})</span><div class="mut" style="font-size:12px">${esc(m.description)}</div>
+     <div class="mono mut">${m.strings.slice(0, 5).map(s => `${esc(s.id)} @${s.offset}: ${esc(s.preview)}`).join("<br>")}</div></div>`).join("");
+  if (h.flags.length) html += `<h2 style="margin-top:14px">Heuristic findings</h2>` + h.flags.map(f =>
+    `<div class="flag"><div>${esc(f.description)}${f.detail ? ` <span class="mut">(${esc(f.detail)})</span>` : ""}</div>
+     <div class="bar"><i style="width:${Math.abs(f.weight)}%;background:${f.weight < 0 ? "#22c55e" : "#f59e0b"}"></i></div></div>`).join("");
+  if (r.pe) html += `<details style="margin-top:12px"><summary>Program details (${esc(r.pe.machine)}, ${r.pe.sections.length} sections, ${r.pe.import_count} imports${r.pe.dotnet ? ", .NET" : ""})</summary>
+    <table style="margin-top:6px"><tr><th>Section</th><th>Size</th><th>Flags</th><th>Entropy</th></tr>${r.pe.sections.map(s => `<tr><td class="mono">${esc(s.name)}</td>
+    <td>${s.raw_size.toLocaleString()}</td><td>${s.executable ? "X" : ""}${s.writable ? "W" : ""}${s.readable ? "R" : ""}</td>
+    <td><div class="bar" style="width:120px"><i style="width:${s.entropy / 8 * 100}%;background:${s.entropy > 7.2 ? "#ef4444" : "#3b82f6"}"></i></div>${s.entropy}</td></tr>`).join("")}</table>
+    <div class="mono mut" style="margin-top:6px">${Object.entries(r.pe.imports).map(([d, f]) => `<b>${esc(d)}</b>: ${esc(f.slice(0, 20).join(", "))}`).join("<br>")}</div></details>`;
+  $("report").innerHTML = html;
+}
+async function analyzePath() { const p = $("apath").value.trim(); if (!p) return; try { showReport(await CyberHub.analyzeFile(p)); } catch (e) { toast(e.message, true); } }
+async function analyzeLocal(file) { try { $("report").innerHTML = '<span class="mut">Analysing…</span>'; showReport(await CyberHub.analyzeBlob(file)); } catch (e) { toast(e.message, true); } }
+const drop = $("drop");
+drop.onclick = () => $("pick").click(); $("pick").onchange = e => e.target.files[0] && analyzeLocal(e.target.files[0]);
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); }; drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); e.dataTransfer.files[0] && analyzeLocal(e.dataTransfer.files[0]); };
+
+// ---------- rules editor (live validation)
+let vt;
+$("rsrc").oninput = () => { clearTimeout(vt); vt = setTimeout(async () => {
+  const r = await CyberHub.validateRules($("rsrc").value).catch(e => ({ error: e.message }));
+  $("valid").innerHTML = r.valid ? `<span style="color:#86efac">✓ ${r.rule_count} rule(s): ${esc(r.rules.join(", "))}</span>`
+    : r.status === "unsupported" ? `<span style="color:#fcd34d">${esc(r.error)}</span>` : `<span style="color:#fca5a5">✕ ${esc(r.error)}</span>`;
+}, 400); };
+async function saveRules() { await act(CyberHub.addRuleSet($("rname").value || "My rules", $("rsrc").value, { replace: true }), "Rule set saved"); }
+async function importRules() { const r = await act(CyberHub.importRules($("ipath").value)); if (r) toast(`${r.imported.length} set(s), ${r.rules} rule(s) imported` + (r.failed.length ? `, ${r.failed.length} failed` : "")); }
+async function selfTest() { const r = await act(CyberHub.rulesSelfTest()); if (r) toast(r.passed ? "✓ Rules engine and heuristics work" : "Self-test failed: " + JSON.stringify(r.checks), !r.passed); }
+
+// ---------- online lookup
+async function saveKeys() {
+  const k = {}; if ($("vtKey").value) k.virustotal = $("vtKey").value; if ($("mbKey").value) k.malwarebazaar = $("mbKey").value;
+  if (!Object.keys(k).length) return toast("Enter a key first", true);
+  await act(CyberHub.setLookupKeys(k), "Keys saved (encrypted)"); $("vtKey").value = $("mbKey").value = "";
+}
+async function lookup() {
+  const h = $("hash").value.trim(); if (!h) return;
+  try {
+    const r = await CyberHub.lookupHash(h);
+    $("lookupRes").innerHTML = `<div class="row">${pill(r.verdict)} <b>${esc(r.threat_label || "")}</b></div>` +
+      Object.entries(r.providers).map(([p, x]) => `<div style="font-size:12px;margin-top:4px">${esc(p)}: ${pill(x.verdict)}
+        ${x.total ? `${x.malicious}/${x.total} engines` : ""} ${x.cached ? '<span class="mut">(cached)</span>' : ""}
+        ${x.permalink ? `<a href="${esc(x.permalink)}" target="_blank">open report</a>` : ""}</div>`).join("") +
+      Object.entries(r.errors).map(([p, e]) => `<div style="font-size:12px;color:#fca5a5">${esc(p)}: ${esc(e.message)}</div>`).join("");
+  } catch (e) { $("lookupRes").innerHTML = `<span style="color:#fca5a5">${esc(e.message)}</span>`; }
+}
+
+(async () => {
+  try { await CyberHub.rulesStatus(); } catch (e) { $("gate").style.display = "block"; return; }
+  $("app").style.display = "grid"; await refresh(); $("rsrc").oninput();
+  setInterval(refresh, 15000);
+})();
+</script>
+</body>
+</html>

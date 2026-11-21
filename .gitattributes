@@ -1,0 +1,8 @@
+# Cyber Hub - keep Windows scripts with CRLF, everything else LF
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.iss text eol=crlf
+*.png binary
+*.webp binary
+*.ico binary

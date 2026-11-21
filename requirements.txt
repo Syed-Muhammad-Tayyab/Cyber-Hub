@@ -1,0 +1,12 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+psutil>=5.9
+pydantic>=2.5
+cryptography>=42      # Part 6: AES-256-GCM quarantine vault (Part 12 password vault reuses it)
+watchdog>=4.0         # Part 7: real-time protection (ReadDirectoryChangesW / inotify file events)
+zxcvbn>=4.4           # Part 12: realistic password strength (pure Python, MIT); without it a basic meter is used
+# Part 8 (optional): yara-python>=4.3 - native YARA engine. Installed separately by start_cyberhub.bat so a
+# missing wheel never blocks the rest; without it the built-in YARA-lite engine is used.
+# dev / tests
+pytest>=8.0
+httpx>=0.27

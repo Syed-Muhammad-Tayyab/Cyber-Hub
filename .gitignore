@@ -1,0 +1,33 @@
+# Cyber Hub - Developed by Syed Muhammad Tayyab
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+# Build output
+build/
+dist/
+*.spec.bak
+# Cyber Hub runtime data (never commit it: database, vault, quarantine, keys, logs)
+/data/
+*.db
+*.db-wal
+*.db-shm
+api_token
+vault.key
+*.chbackup
+*.chx
+*.chvault
+/logs/
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

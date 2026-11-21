@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<!-- Cyber Hub - Quarantine & protection history example (Part 6) | Developed by Syed Muhammad Tayyab
+     Copy this file + cyberhub-api.js (+ auth-example.html) into ../ui/, start the engine,
+     sign in at /auth-example.html, then open http://127.0.0.1:8765/quarantine-example.html -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cyber Hub · Quarantine &amp; protection history</title>
+<style>
+  :root{--bg:#0b1220;--card:rgba(30,58,138,.22);--line:rgba(96,165,250,.22);--txt:#e2e8f0;--mut:#94a3b8;--acc:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 "Segoe UI",system-ui,sans-serif}
+  header,footer{padding:12px 24px;color:#93c5fd;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+  footer{color:var(--mut);justify-content:center}
+  h1{margin:0;font-size:20px;color:var(--txt)} h2{margin:0 0 12px;font-size:14px;color:#bfdbfe;font-weight:600}
+  main{padding:0 24px 12px;display:grid;gap:16px;grid-template-columns:repeat(12,1fr)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;backdrop-filter:blur(10px)}
+  .s12{grid-column:span 12}.s8{grid-column:span 8}.s6{grid-column:span 6}.s4{grid-column:span 4}.s3{grid-column:span 3}
+  @media(max-width:1000px){.s8,.s6,.s4,.s3{grid-column:span 12}}
+  .stat b{display:block;font-size:26px} .stat span{color:var(--mut);font-size:12px}
+  .hero{display:flex;align-items:center;gap:20px}
+  .shield{width:84px;height:84px;border-radius:50%;display:grid;place-items:center;font-size:38px;flex:none;background:rgba(34,197,94,.18)}
+  .shield.bad{background:rgba(239,68,68,.2)}
+  .donut{width:130px;height:130px;border-radius:50%;flex:none;display:grid;place-items:center}
+  .donut div{width:92px;height:92px;border-radius:50%;background:#0f172a;display:grid;place-items:center;text-align:center;font-size:12px}
+  .donut b{font-size:22px;display:block}
+  .legend{display:grid;gap:4px;font-size:12px} .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+  .bar{height:8px;background:#1e293b;border-radius:99px;overflow:hidden} .bar i{display:block;height:100%;background:var(--acc)}
+  table{width:100%;border-collapse:collapse;font-size:13px} td,th{padding:6px 4px;text-align:left;border-bottom:1px solid #1e293b;vertical-align:top}
+  th{color:var(--mut);font-weight:500} tr.click{cursor:pointer} tr.click:hover td{background:rgba(59,130,246,.08)}
+  .pill{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap}
+  .low{background:#1e3a8a;color:#bfdbfe}.medium{background:#78350f;color:#fcd34d}.high{background:#7f1d1d;color:#fca5a5}.critical{background:#450a0a;color:#fecaca;border:1px solid #ef4444}
+  .active{background:#7f1d1d;color:#fca5a5}.quarantined{background:#1e3a8a;color:#bfdbfe}.removed,.deleted{background:#14532d;color:#86efac}
+  .restored{background:#78350f;color:#fcd34d}.allowed{background:#3b0764;color:#e9d5ff}.dismissed,.resolved,.superseded,.missing{background:#334155;color:#cbd5e1}
+  button,input,select{font:inherit;color:var(--txt);background:#0f172a;border:1px solid #334155;border-radius:8px;padding:4px 9px}
+  button{cursor:pointer;background:#1e3a8a;border-color:#1e40af} button.danger{background:#7f1d1d;border-color:#991b1b}
+  button.big{padding:10px 18px;font-weight:600} button:disabled{opacity:.4;cursor:not-allowed}
+  .mut{color:var(--mut)} .mono{font-family:Consolas,monospace;font-size:12px;word-break:break-all}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .bars{display:flex;align-items:flex-end;gap:6px;height:110px}
+  .bars .day{flex:1;max-width:30px;height:100%;display:flex;align-items:flex-end;gap:2px}
+  .bars .day i{flex:1;border-radius:4px 4px 0 0;min-height:2px}
+  .scroll{max-height:380px;overflow:auto} #gate{text-align:center;padding:60px}
+  #drawer{position:fixed;top:0;right:0;width:min(520px,100%);height:100%;background:#0f172a;border-left:1px solid var(--line);padding:20px;overflow:auto;transform:translateX(100%);transition:transform .25s;z-index:5}
+  #drawer.open{transform:none}
+  .tl{border-left:2px solid #1e3a8a;margin:8px 0 0 6px;padding-left:14px} .tl>div{position:relative;margin-bottom:10px}
+  .tl>div:before{content:"";position:absolute;left:-20px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--acc)}
+  #toast{position:fixed;right:20px;bottom:20px;background:#1e3a8a;border:1px solid #3b82f6;padding:12px 16px;border-radius:12px;display:none;max-width:380px;z-index:6}
+</style>
+</head>
+<body>
+<header><h1>🛡️ Cyber Hub · Quarantine &amp; protection history</h1><span>Developed by Syed Muhammad Tayyab · <a href="scanner-example.html" style="color:#93c5fd">Scanner</a></span></header>
+<div id="gate" style="display:none">Sign in first at <a href="auth-example.html" style="color:#93c5fd">auth-example.html</a>, then come back.</div>
+
+<main id="app" style="display:none">
+  <section class="card s8 hero">
+    <div id="shield" class="shield">🛡️</div>
+    <div style="flex:1"><h2 id="statusText" style="font-size:18px;color:var(--txt)">…</h2>
+      <div class="mut" id="statusSub"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="big" id="startBtn" onclick="startActions()">Start actions</button>
+        <input id="qPath" placeholder="Quarantine a file: C:\Users\you\Downloads\odd.exe" style="width:340px">
+        <button onclick="quarantinePath()">Quarantine file</button></div></div>
+  </section>
+  <section class="card s4 row" style="gap:16px">
+    <div class="donut" id="donut"><div><span><b id="donutN">0</b>threats</span></div></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <section class="card s3 stat"><b id="stActive">–</b><span>active threats</span></section>
+  <section class="card s3 stat"><b id="stQ">–</b><span>items in quarantine · <span id="stQSize"></span></span>
+    <div class="bar" style="margin-top:8px"><i id="stQBar" style="width:0"></i></div></section>
+  <section class="card s3 stat"><b id="stHandled">–</b><span>of threats handled</span></section>
+  <section class="card s3 stat"><b id="stAllowed">–</b><span>allowed threats</span></section>
+
+  <section class="card s8"><h2>Last 30 days</h2><div class="bars" id="days"></div>
+    <div class="mut" style="font-size:11px;margin-top:6px">
+      <span style="color:var(--bad)">■</span> detected · <span style="color:var(--acc)">■</span> quarantined ·
+      <span style="color:var(--ok)">■</span> removed · <span style="color:var(--warn)">■</span> restored</div></section>
+  <section class="card s4"><h2>Top threats</h2><table><tbody id="top"></tbody></table></section>
+
+  <section class="card s12"><h2>Protection history</h2>
+    <div class="row" style="margin-bottom:10px">
+      <select id="fStatus"><option value="history">All (no duplicates)</option><option>active</option><option>quarantined</option>
+        <option>removed</option><option>restored</option><option>allowed</option><option>dismissed</option><option>resolved</option></select>
+      <select id="fSev"><option value="">Any severity</option><option>critical</option><option>high</option><option>medium</option><option>low</option></select>
+      <input id="fSearch" placeholder="Search name, path or SHA-256" style="width:280px">
+      <button onclick="loadHistory()">Filter</button><button onclick="CyberHub.downloadThreatCsv(filters())">Export CSV</button>
+      <button class="danger" onclick="clearHistory()">Clear finished</button></div>
+    <div class="scroll"><table><thead><tr><th>Threat</th><th>Status</th><th>File</th><th>Detected</th><th>Actions</th></tr></thead>
+      <tbody id="hist"></tbody></table></div></section>
+
+  <section class="card s8"><h2>Quarantine vault <span class="mut" id="vaultInfo" style="font-weight:400"></span></h2>
+    <div class="scroll"><table><thead><tr><th>File</th><th>Threat</th><th>Size</th><th>Quarantined</th><th>Expires</th><th></th></tr></thead>
+      <tbody id="qlist"></tbody></table></div>
+    <div class="row" style="margin-top:10px"><label><input type="checkbox" id="allowOnRestore"> add to allowed threats when restoring</label>
+      <button onclick="checkVault()">Check vault</button><button class="danger" onclick="purge()">Empty vault</button></div></section>
+  <section class="card s4"><h2>Settings</h2>
+    <div style="display:grid;gap:8px">
+      <label>Act automatically on threats found by scans<br><select id="sAuto" onchange="saveSettings()">
+        <option value="off">Off - I decide</option><option value="high">Quarantine high &amp; critical</option><option value="all">Quarantine everything</option></select></label>
+      <label>Keep quarantined items for <input id="sRet" type="number" min="0" max="3650" style="width:80px" onchange="saveSettings()"> days (0 = forever)</label>
+      <label>Vault size limit <input id="sMax" type="number" min="64" max="102400" style="width:90px" onchange="saveSettings()"> MB</label>
+      <label><input type="checkbox" id="sKill" onchange="saveSettings()"> stop programs running a file before quarantining it</label></div>
+    <h2 style="margin-top:16px">Allowed threats</h2><table><tbody id="allowed"></tbody></table></section>
+</main>
+
+<aside id="drawer"><div class="row" style="justify-content:space-between"><h2 id="dTitle" style="margin:0">Threat</h2><button onclick="closeDrawer()">✕</button></div>
+  <div id="dBody"></div></aside>
+<div id="toast"></div>
+<footer>Cyber Hub v0.6.0 · Part 6 of 20 · Developed by Syed Muhammad Tayyab</footer>
+
+<script src="cyberhub-api.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+// Paths and threat names come from disk / imported feeds - always escape before inserting HTML.
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const when = t => t ? new Date(t).toLocaleString() : "–";
+const mb = b => b >= 1048576 ? (b / 1048576).toFixed(1) + " MB" : b >= 1024 ? (b / 1024).toFixed(1) + " KB" : b + " B";
+const COLORS = { active: "#ef4444", quarantined: "#3b82f6", removed: "#22c55e", restored: "#f59e0b", allowed: "#a855f7",
+                 dismissed: "#64748b", resolved: "#94a3b8" };
+const LABEL = { quarantine: "Quarantine", remove: "Remove", allow: "Allow", dismiss: "Dismiss", restore: "Restore", delete: "Delete" };
+function toast(t) { $("toast").innerHTML = t; $("toast").style.display = "block"; setTimeout(() => $("toast").style.display = "none", 5000); }
+const run = async (fn, okMsg) => { try { const r = await fn(); if (okMsg) toast(okMsg); refresh(); return r; } catch (e) { alert(e.message); } };
+const filters = () => ({ status: $("fStatus").value, ...($("fSev").value ? { severity: $("fSev").value } : {}),
+                         ...($("fSearch").value.trim() ? { search: $("fSearch").value.trim() } : {}) });
+
+async function loadSummary() {
+  const s = await CyberHub.threatSummary(30), q = s.quarantine;
+  $("shield").className = "shield" + (s.active_threats ? " bad" : "");
+  $("shield").textContent = s.active_threats ? "⚠️" : "✅";
+  $("statusText").textContent = s.active_threats ? `${s.active_threats} threat(s) need action` : "No current threats";
+  $("statusSub").textContent = s.recommendation + (q.auto_quarantine !== "off" ? ` · automatic quarantine: ${q.auto_quarantine}` : "");
+  $("startBtn").disabled = !s.active_threats;
+  $("stActive").textContent = s.active_threats; $("stQ").textContent = q.items; $("stQSize").textContent = mb(q.original_bytes);
+  $("stQBar").style.width = Math.min(100, q.used_percent) + "%"; $("stHandled").textContent = s.handled_percent + "%";
+  $("stAllowed").textContent = q.allowed_threats;
+  $("vaultInfo").textContent = `· ${q.vault.cipher} · key: ${q.vault.key_protection || "unavailable"}`;
+  // donut of every threat by what happened to it
+  const parts = Object.entries(s.by_status).filter(([k, n]) => n && COLORS[k]);
+  const total = parts.reduce((a, [, n]) => a + n, 0);
+  let acc = 0;
+  $("donut").style.background = total ? `conic-gradient(${parts.map(([k, n]) => `${COLORS[k]} ${acc / total * 360}deg ${(acc += n) / total * 360}deg`).join(",")})` : "#1e293b";
+  $("donutN").textContent = total;
+  $("legend").innerHTML = parts.map(([k, n]) => `<span><i style="background:${COLORS[k]}"></i>${k} · ${n}</span>`).join("") || '<span class="mut">nothing yet</span>';
+  const max = Math.max(1, ...s.by_day.map(d => Math.max(d.detected, d.quarantined, d.removed, d.restored)));
+  $("days").innerHTML = s.by_day.map(d => `<div class="day" title="${d.day}: ${d.detected} detected, ${d.quarantined} quarantined, ${d.removed} removed, ${d.restored} restored">
+      ${[["detected", "--bad"], ["quarantined", "--acc"], ["removed", "--ok"], ["restored", "--warn"]].map(([k, c]) =>
+        `<i style="height:${d[k] / max * 100}%;background:var(${c})"></i>`).join("")}</div>`).join("") || '<span class="mut">no activity yet</span>';
+  $("top").innerHTML = s.top_threats.map(t => `<tr><td><span class="pill ${t.severity}">${esc(t.severity)}</span> ${esc(t.threat_name)}</td><td>${t.n}</td></tr>`).join("")
+    || '<tr><td class="mut">nothing found 🎉</td></tr>';
+}
+
+async function loadHistory() {
+  const j = await CyberHub.threats({ ...filters(), limit: 300 });
+  $("hist").innerHTML = j.items.map(d => `<tr class="click" onclick="openThreat(${d.id})">
+    <td><span class="pill ${d.severity}">${esc(d.severity)}</span> ${esc(d.threat_name)}</td><td><span class="pill ${d.status}">${esc(d.status)}</span></td>
+    <td class="mono">${esc(d.path)}${d.archive_member ? " › " + esc(d.archive_member) : ""}</td><td class="mut">${when(d.detected_at)}</td>
+    <td onclick="event.stopPropagation()">${d.actions.filter(a => !["restore", "delete"].includes(a)).map(a =>
+      `<button ${a === "remove" ? 'class="danger"' : ""} onclick="act('${a}', ${d.id})">${LABEL[a]}</button>`).join(" ")}</td></tr>`).join("")
+    || '<tr><td colspan="5" class="mut">Nothing here</td></tr>';
+}
+
+async function loadQuarantine() {
+  const j = await CyberHub.quarantine({ limit: 300 });
+  $("qlist").innerHTML = j.items.map(q => `<tr><td><b>${esc(q.file_name)}</b><div class="mono mut">${esc(q.original_path)}</div>
+      ${q.original_state === "pending_reboot" ? '<span class="pill medium">removed after restart</span>' : ""}</td>
+    <td><span class="pill ${q.severity}">${esc(q.severity)}</span> ${esc(q.threat_name)}<div class="mut">${esc(q.source)} · by ${esc(q.quarantined_by)}</div></td>
+    <td>${mb(q.size)}</td><td class="mut">${when(q.quarantined_at)}</td><td class="mut">${q.expires_at ? when(q.expires_at) : "never"}</td>
+    <td style="white-space:nowrap"><button onclick="restore('${q.id}')">Restore</button><button class="danger" onclick="del('${q.id}')">Delete</button>
+      <br><button onclick="verify('${q.id}')" style="margin-top:4px">Verify</button><button onclick="rescan('${q.id}')">Rescan</button></td></tr>`).join("")
+    || '<tr><td colspan="6" class="mut">The vault is empty</td></tr>';
+}
+
+async function loadAllowed() {
+  const j = await CyberHub.allowedThreats();
+  $("allowed").innerHTML = j.items.map(a => `<tr><td>${esc(a.threat_name || a.value)}<div class="mono mut">${a.kind === "sha256" ? esc(a.value.slice(0, 24)) + "…" : "every file with this name"}</div>
+    <div class="mut">skipped ${a.hits}× · by ${esc(a.added_by)}</div></td><td><button onclick="unallow(${a.id})">Remove</button></td></tr>`).join("")
+    || '<tr><td class="mut">None - every threat is reported</td></tr>';
+}
+
+async function loadSettings() {
+  const s = await CyberHub.getSettings();
+  $("sAuto").value = s.scan_auto_quarantine; $("sRet").value = s.quarantine_retention_days;
+  $("sMax").value = s.quarantine_max_mb; $("sKill").checked = s.quarantine_kill_processes;
+}
+const saveSettings = () => run(() => CyberHub.updateSettings({ scan_auto_quarantine: $("sAuto").value, quarantine_retention_days: +$("sRet").value,
+                                                              quarantine_max_mb: +$("sMax").value, quarantine_kill_processes: $("sKill").checked }), "Settings saved");
+const refresh = () => Promise.all([loadSummary(), loadHistory(), loadQuarantine(), loadAllowed()]).catch(e => console.warn(e));
+
+async function act(a, id) {
+  if (a === "remove" && !confirm("Remove permanently? No copy is kept, so it can't be restored.")) return;
+  if (a === "allow" && !confirm("Allow this file? Scans will stop reporting it. Only do this if you trust it.")) return;
+  const fn = { quarantine: CyberHub.quarantineThreat, remove: CyberHub.removeThreat, allow: CyberHub.allowThreat, dismiss: CyberHub.dismissThreat }[a];
+  await run(() => fn(id), `${LABEL[a]}: done`);
+  if ($("drawer").classList.contains("open")) openThreat(id);
+}
+async function startActions() {
+  const r = await run(() => CyberHub.threatActions("quarantine"));
+  if (r) toast(`Quarantined ${r.succeeded} of ${r.requested}` + (r.failed ? ` · ${r.failed} failed: ${esc(r.results.find(x => !x.ok).error)}` : ""));
+}
+const quarantinePath = () => $("qPath").value.trim() && run(() => CyberHub.quarantineFile($("qPath").value.trim()), "File quarantined");
+async function restore(id) {
+  if (!confirm("Restore this file to where it was? It was quarantined because it looked dangerous.")) return;
+  const r = await run(() => CyberHub.restoreQuarantined(id, { allow: $("allowOnRestore").checked }));
+  if (r) toast(`Restored to <span class="mono">${esc(r.restored_path)}</span>` + (r.warning ? `<br>${esc(r.warning)}` : ""));
+}
+const del = id => confirm("Delete permanently?") && run(() => CyberHub.deleteQuarantined(id), "Deleted");
+const verify = id => CyberHub.verifyQuarantined(id).then(r => toast((r.ok ? "✔ " : "✘ ") + esc(r.message))).catch(e => alert(e.message));
+const rescan = id => CyberHub.rescanQuarantined(id).then(r => toast(`${r.still_detected ? "⚠ still detected" : "✔ clean now"} · ${esc(r.advice)}`)).catch(e => alert(e.message));
+const unallow = id => confirm("Remove from allowed threats? Scans will report it again.") && run(() => CyberHub.removeAllowed(id), "Removed");
+const checkVault = () => run(() => CyberHub.checkVault()).then(r => r && toast(`Vault checked · ${r.missing_items} missing · ${r.orphan_files_removed} orphan file(s) removed`));
+const purge = () => confirm("Permanently delete EVERYTHING in quarantine?") && run(() => CyberHub.purgeQuarantine(), "Vault emptied");
+const clearHistory = () => confirm("Forget finished history? Active and quarantined threats are kept.") &&
+  run(() => CyberHub.clearThreatHistory()).then(r => r && toast(`Removed ${r.detections_deleted} entr(ies)`));
+
+async function openThreat(id) {
+  const d = await CyberHub.threat(id);
+  $("dTitle").textContent = d.threat_name;
+  $("dBody").innerHTML = `<p><span class="pill ${d.severity}">${esc(d.severity)}</span> <span class="pill ${d.status}">${esc(d.status)}</span>
+      <span class="mut">found by ${esc(d.method)} match</span></p>
+    <p class="mono">${esc(d.path)}${d.archive_member ? " › " + esc(d.archive_member) : ""}</p>
+    <p class="mut">SHA-256 <span class="mono">${esc(d.sha256 || "–")}</span><br>Size ${d.size != null ? mb(d.size) : "–"} ·
+      file ${d.file_exists ? "still on disk" : "not on disk"} · ${d.same_file_detections} other detection(s) of the same file</p>
+    ${d.allowed_entry ? `<p><span class="pill allowed">allowed</span> ${esc(d.allowed_entry.note || "")}</p>` : ""}
+    <div class="row">${d.actions.filter(a => !["restore", "delete"].includes(a)).map(a => `<button onclick="act('${a}', ${d.id})">${LABEL[a]}</button>`).join("")}
+      ${d.quarantine_item && d.quarantine_item.can_restore ? `<button onclick="restore('${d.quarantine_item.id}')">Restore</button>` : ""}</div>
+    <h2 style="margin-top:18px">Timeline</h2><div class="tl">${d.events.map(e => `<div><b>${esc(e.action)}</b> <span class="mut">${when(e.ts)}</span>
+      ${e.username ? `<span class="mut">by ${esc(e.username)}</span>` : ""}<div class="mut">${esc(e.detail || "")}</div></div>`).join("")}</div>`;
+  $("drawer").classList.add("open");
+}
+const closeDrawer = () => $("drawer").classList.remove("open");
+
+window.addEventListener("cyberhub:locked", () => location.href = "auth-example.html");
+window.addEventListener("cyberhub:signedout", () => location.href = "auth-example.html");
+
+(async () => {
+  if (!CyberHub.isSignedIn()) { $("gate").style.display = "block"; return; }
+  $("app").style.display = "grid";
+  await Promise.all([refresh(), loadSettings()]);
+  let t = null;   // threats found by a running scan + quarantine actions arrive on the scan stream
+  CyberHub.streamScans(({ events }) => {
+    if (events.some(e => ["threat", "quarantined", "restored", "quarantine_deleted", "job_finished"].includes(e.type))) {
+      clearTimeout(t); t = setTimeout(refresh, 400);
+    }
+    for (const e of events) if (e.type === "quarantined" && e.item.source === "auto")
+      toast(`🛡️ Automatically quarantined <b>${esc(e.item.threat_name)}</b>`);
+  });
+})();
+</script>
+</body>
+</html>

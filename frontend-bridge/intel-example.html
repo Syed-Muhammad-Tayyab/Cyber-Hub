@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<!-- Cyber Hub - Threat Intelligence example (Part 15) | Developed by Syed Muhammad Tayyab
+     Copy this file + cyberhub-api.js (+ auth-example.html) into ../ui/, start the engine, sign in at
+     /auth-example.html, then open http://127.0.0.1:8765/intel-example.html
+     Indicators, page titles and feed text come from the internet: everything is escaped and shown defanged. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cyber Hub · Threat intelligence</title>
+<style>
+  :root{--bg:#0b1220;--card:rgba(30,58,138,.22);--line:rgba(96,165,250,.22);--txt:#e2e8f0;--mut:#94a3b8;--acc:#3b82f6}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 "Segoe UI",system-ui,sans-serif}
+  header,footer{padding:12px 24px;color:#93c5fd;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+  footer{color:var(--mut);justify-content:center} a{color:#93c5fd}
+  h1{margin:0;font-size:20px;color:var(--txt)} h2{margin:0 0 12px;font-size:14px;color:#bfdbfe;font-weight:600}
+  main{padding:0 24px 12px;display:grid;gap:16px;grid-template-columns:repeat(12,1fr)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;backdrop-filter:blur(10px)}
+  .s12{grid-column:span 12}.s8{grid-column:span 8}.s6{grid-column:span 6}.s4{grid-column:span 4}
+  @media(max-width:1100px){.s8,.s6,.s4{grid-column:span 12}}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  button,input,select,textarea{font:inherit;color:var(--txt);background:#0f172a;border:1px solid #334155;border-radius:8px;padding:5px 10px}
+  button{cursor:pointer;background:#1e3a8a;border-color:#1e40af} button.ghost{background:transparent;border-color:#334155}
+  textarea{width:100%;min-height:70px} .wide{flex:1;min-width:220px}
+  table{width:100%;border-collapse:collapse;font-size:13px} td,th{padding:6px 4px;text-align:left;border-bottom:1px solid #1e293b;vertical-align:top}
+  th{color:var(--mut);font-weight:500}
+  .pill{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap}
+  .clean,.ok{background:#14532d;color:#86efac}.malicious,.high,.critical,.error{background:#7f1d1d;color:#fca5a5}
+  .suspicious,.medium,.needs_key{background:#78350f;color:#fcd34d}.low_risk,.low,.never{background:#1e3a5f;color:#93c5fd}
+  .unknown,.info,.manual{background:#334155;color:#cbd5e1}
+  .mut{color:var(--mut)} .mono{font-family:Consolas,monospace;font-size:12px;word-break:break-all}
+  .ring{width:130px;height:130px;flex:none} .verdict{font-size:26px;font-weight:700;text-transform:capitalize}
+  .bars div{display:flex;align-items:center;gap:8px;font-size:12px;margin:3px 0} .bars i{display:block;height:8px;background:var(--acc);border-radius:9px}
+  .scroll{max-height:380px;overflow:auto} #gate{text-align:center;padding:60px} ul{margin:6px 0;padding-left:18px}
+  #toast{position:fixed;right:20px;bottom:20px;background:#1e3a8a;border:1px solid #3b82f6;padding:12px 16px;border-radius:12px;display:none;max-width:480px;z-index:6}
+  #toast.bad{background:#450a0a;border-color:#ef4444}
+</style>
+</head>
+<body>
+<header><h1>🛰️ Cyber Hub · Threat intelligence</h1>
+  <span>Developed by Syed Muhammad Tayyab · <a href="web-example.html">Web</a> · <a href="network-example.html">Network</a> · <a href="firewall-example.html">Firewall</a></span></header>
+<div id="gate" style="display:none">Sign in first at <a href="auth-example.html">auth-example.html</a>, then come back.</div>
+
+<main id="app" style="display:none">
+  <section class="card s4">
+    <h2>Threat intel health</h2>
+    <div class="row"><svg class="ring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#1e293b" stroke-width="3"/>
+      <circle id="ringArc" cx="18" cy="18" r="15.9" fill="none" stroke="#22c55e" stroke-width="3" stroke-dasharray="0 100" transform="rotate(-90 18 18)" stroke-linecap="round"/>
+      <text id="ringTxt" x="18" y="20" text-anchor="middle" fill="#e2e8f0" font-size="8">–</text></svg>
+      <div><div id="hIocs" class="mut"></div><div id="hFeeds" class="mut"></div><div id="hAlerts" class="mut"></div>
+        <div id="hWatch" class="mut"></div><div id="hSigs" class="mut"></div></div></div>
+    <div class="row" style="margin-top:10px"><button id="btnRefresh">Update feeds now</button>
+      <button class="ghost" id="btnWatch">Check connections now</button></div>
+  </section>
+
+  <section class="card s8">
+    <h2>Is it dangerous?</h2>
+    <div class="row"><input id="val" class="wide" placeholder="IP · domain · link · e-mail · file hash   (hxxp://evil[.]com works too)">
+      <button id="btnCheck">Check</button></div>
+    <div class="row" style="margin-top:6px"><label><input type="checkbox" id="deep"> Open the page safely (deep check)</label>
+      <label><input type="checkbox" id="online"> Ask VirusTotal / abuse.ch / AbuseIPDB</label>
+      <button class="ghost" id="btnHunt">Was it ever on this PC?</button></div>
+    <div id="result" style="display:none;margin-top:12px">
+      <div class="row"><span id="rVerdict" class="verdict"></span><span id="rScore" class="mut"></span><span id="rInd" class="mono mut"></span></div>
+      <ul id="rReasons"></ul>
+      <div class="row" id="rActions"></div>
+      <details style="margin-top:8px"><summary class="mut">Feed matches, phishing analysis, page, online answers</summary>
+        <pre id="rRaw" class="mono" style="white-space:pre-wrap"></pre></details>
+    </div>
+  </section>
+
+  <section class="card s6">
+    <h2>Check a whole message / report</h2>
+    <textarea id="bulk" placeholder="Paste a suspicious e-mail, WhatsApp message or incident report…"></textarea>
+    <div class="row" style="margin-top:6px"><button id="btnBulk">Check everything in it</button><span id="bulkSum" class="mut"></span></div>
+    <div class="scroll"><table><tbody id="bulkRows"></tbody></table></div>
+  </section>
+
+  <section class="card s6">
+    <h2>Alerts</h2>
+    <div class="scroll"><table><tbody id="events"></tbody></table></div>
+  </section>
+
+  <section class="card s8">
+    <h2>Feeds</h2>
+    <div class="scroll"><table><thead><tr><th>Feed</th><th>Indicators</th><th>Status</th><th>Updated</th><th></th></tr></thead>
+      <tbody id="feeds"></tbody></table></div>
+  </section>
+
+  <section class="card s4">
+    <h2>What the feeds know</h2>
+    <div id="byType" class="bars"></div>
+    <h2 style="margin-top:12px">Top malware families</h2>
+    <div id="threats" class="bars"></div>
+  </section>
+
+  <section class="card s6">
+    <h2>My block list</h2>
+    <div class="row"><input id="blockVal" class="wide" placeholder="Add IPs, domains, links, hashes (comma / space separated)">
+      <button id="btnBlock">Add</button>
+      <button class="ghost" id="btnExport">Export STIX</button></div>
+    <div class="scroll"><table><tbody id="blockRows"></tbody></table></div>
+  </section>
+
+  <section class="card s6">
+    <h2>Search the intel database</h2>
+    <div class="row"><input id="q" class="wide" placeholder="185.220.101.47 · asyncrat · evil.com"><button id="btnSearch">Search</button></div>
+    <div class="scroll"><table><tbody id="iocRows"></tbody></table></div>
+  </section>
+</main>
+<footer>Cyber Hub · Threat Intelligence (Part 15) · Developed by Syed Muhammad Tayyab</footer>
+<div id="toast"></div>
+
+<script src="cyberhub-api.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+const pill = s => `<span class="pill ${esc(s)}">${esc(String(s).replace("_", " "))}</span>`;
+const when = t => t ? new Date(t).toLocaleString() : "–";
+function toast(msg, bad) { const t = $("#toast"); t.textContent = msg; t.className = bad ? "bad" : ""; t.style.display = "block";
+  clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 5000); }
+
+async function loadStatus() {
+  const h = await CyberHub.intelHealth(), sc = h.score;
+  $("#ringArc").setAttribute("stroke-dasharray", `${sc} 100`);
+  $("#ringArc").setAttribute("stroke", sc >= 80 ? "#22c55e" : sc >= 60 ? "#f59e0b" : "#ef4444");
+  $("#ringTxt").textContent = sc;
+  $("#hIocs").textContent = `${h.iocs.toLocaleString()} known-bad indicators`;
+  $("#hFeeds").textContent = `${h.feeds_ok}/${h.feeds_enabled} feeds up to date` + (h.feeds_need_key.length ? ` · ${h.feeds_need_key.length} need an abuse.ch key` : "");
+  $("#hAlerts").textContent = `Open alerts: ${h.open_alerts.critical} critical · ${h.open_alerts.high} high · ${h.open_alerts.medium} medium`;
+  $("#hWatch").textContent = `Connection watch ${h.watch_connections ? "on" : "OFF"} · auto-block ${h.auto_block}`;
+  $("#hSigs").textContent = `${h.signatures_from_feeds} feed hashes in the antivirus`;
+}
+function showCheck(r) {
+  $("#result").style.display = "block";
+  $("#rVerdict").innerHTML = pill(r.verdict);
+  $("#rScore").textContent = `${r.score}/100` + (r.online_used ? " · online checked" : "") + (r.corroborated ? " · several sources agree" : "");
+  $("#rInd").textContent = `${r.indicator.type}: ${r.indicator.defanged}`;
+  $("#rReasons").innerHTML = (r.reasons.length ? r.reasons : [r.summary]).map(x => `<li>${esc(x)}</li>`).join("");
+  $("#rActions").innerHTML = r.actions.map((a, i) => `<button class="${a.action === "allow" ? "ghost" : ""}" data-act="${i}">${esc(a.label)}</button>`).join("");
+  $("#rActions")._acts = r.actions; $("#rActions")._r = r;
+  $("#rRaw").textContent = JSON.stringify({ matches: r.matches, phishing: r.phishing, page: r.page, online: r.online,
+                                            online_errors: r.online_errors }, null, 2);
+}
+async function check() {
+  const v = $("#val").value.trim(); if (!v) return;
+  try { showCheck(await CyberHub.checkIndicator(v, { deep: $("#deep").checked, online: $("#online").checked || null })); }
+  catch (e) { toast(e.message, true); }
+}
+async function loadFeeds() {
+  const f = await CyberHub.intelFeeds();
+  $("#feeds").innerHTML = f.items.map(x => `<tr><td><b>${esc(x.name)}</b><div class="mut">${esc(x.description || x.category_label)}</div>
+      ${x.last_error ? `<div class="mut">⚠ ${esc(x.last_error)}</div>` : ""}</td>
+    <td>${esc(x.ioc_count.toLocaleString())}</td><td>${x.enabled ? pill(x.status) : pill("off")}</td><td class="mut">${esc(when(x.last_ok_at))}</td>
+    <td>${x.local ? "" : `<button class="ghost" data-feed="${esc(x.id)}" data-on="${x.enabled ? 0 : 1}">${x.enabled ? "Turn off" : "Turn on"}</button>`}</td></tr>`).join("");
+}
+async function loadSummary() {
+  const s = await CyberHub.intelSummary();
+  const types = Object.entries(s.iocs_by_type), max = Math.max(1, ...types.map(t => t[1]));
+  $("#byType").innerHTML = types.map(([k, n]) => `<div><span style="width:60px">${esc(k)}</span><i style="width:${Math.round(150 * n / max)}px"></i>${esc(n.toLocaleString())}</div>`).join("") || `<span class="mut">No feeds loaded yet</span>`;
+  const tmax = Math.max(1, ...s.top_threats.map(t => t.count));
+  $("#threats").innerHTML = s.top_threats.map(t => `<div><span style="width:110px">${esc(t.name)}</span><i style="width:${Math.round(110 * t.count / tmax)}px"></i>${esc(t.count)}</div>`).join("") || `<span class="mut">–</span>`;
+}
+async function loadEvents() {
+  const ev = await CyberHub.intelEvents({ limit: 30 });
+  $("#events").innerHTML = ev.items.map(e => `<tr><td>${pill(e.severity)}</td><td><b>${esc(e.title)}</b><div class="mut">${esc(e.detail || "")}</div></td>
+    <td>${e.data && e.data.fix && e.data.fix.action === "block_ip" ? `<button data-evblock="${esc(e.id)}">Block</button>` : ""}</td>
+    <td class="mut">${esc(when(e.ts))}</td></tr>`).join("") || `<tr><td class="mut">No alerts - nothing on this PC matched the feeds</td></tr>`;
+}
+async function loadBlock() {
+  const b = await CyberHub.blocklist();
+  $("#blockRows").innerHTML = b.items.map(x => `<tr><td>${pill(x.severity)}</td><td class="mono">${esc(x.defanged)}</td><td class="mut">${esc(x.note || "")}</td></tr>`).join("")
+    || `<tr><td class="mut">Empty - add anything you never want to talk to</td></tr>`;
+}
+function loadAll() { loadStatus(); loadFeeds(); loadSummary(); loadEvents(); loadBlock(); }
+
+$("#btnCheck").onclick = check;
+$("#val").onkeydown = e => { if (e.key === "Enter") check(); };
+$("#btnHunt").onclick = async () => {
+  try { const h = await CyberHub.huntIndicator($("#val").value.trim());
+    toast(h.total ? `Seen ${h.total} time(s): ` + Object.entries(h.counts).map(([k, n]) => `${k} ${n}`).join(", ") : "Never seen on this PC");
+    $("#result").style.display = "block"; $("#rRaw").textContent = JSON.stringify(h.items, null, 2); }
+  catch (e) { toast(e.message, true); }
+};
+$("#btnBulk").onclick = async () => {
+  try { const r = await CyberHub.checkText($("#bulk").value);
+    $("#bulkSum").textContent = `${r.total} found · ${r.counts.malicious} malicious · ${r.counts.suspicious} suspicious`;
+    $("#bulkRows").innerHTML = r.items.map(i => `<tr><td>${pill(i.verdict)}</td><td class="mono">${esc(i.defanged)}</td><td class="mut">${esc(i.summary)}</td></tr>`).join(""); }
+  catch (e) { toast(e.message, true); }
+};
+$("#btnRefresh").onclick = async () => {
+  try { const j = await CyberHub.refreshFeeds({ force: true });
+    const done = await CyberHub.waitFeedRefresh(j.id, p => $("#btnRefresh").textContent = `Updating ${p.done}/${p.total}…`);
+    $("#btnRefresh").textContent = "Update feeds now";
+    toast(`${done.result.updated} feed(s) updated · ${done.result.total_iocs.toLocaleString()} indicators` +
+          (done.result.needs_key.length ? ` · add your abuse.ch key for ${done.result.needs_key.join(", ")}` : ""));
+    loadAll(); }
+  catch (e) { $("#btnRefresh").textContent = "Update feeds now"; toast(e.message, true); }
+};
+$("#btnWatch").onclick = async () => { const r = await CyberHub.runIntelWatch();
+  toast(r.skipped ? `Skipped: ${r.skipped}` : `${r.checked} connection(s) checked · ${r.matches} match(es)`, r.matches > 0); loadEvents(); };
+$("#btnBlock").onclick = async () => {
+  try { const r = await CyberHub.addToBlocklist({ text: $("#blockVal").value });
+    toast(`${r.added} added` + (r.refused.length ? ` · ${r.refused.length} refused` : "")); $("#blockVal").value = ""; loadBlock(); loadStatus(); }
+  catch (e) { toast(e.message, true); }
+};
+$("#btnExport").onclick = () => CyberHub.downloadIntelExport("stix").catch(e => toast(e.message, true));
+$("#btnSearch").onclick = async () => {
+  const r = await CyberHub.searchIocs({ q: $("#q").value.trim(), limit: 100 });
+  $("#iocRows").innerHTML = r.items.map(i => `<tr><td>${pill(i.severity)}</td><td class="mono">${esc(i.defanged)}</td>
+    <td>${esc(i.threat || i.category_label)}<div class="mut">${esc(i.feed_name)}</div></td></tr>`).join("") || `<tr><td class="mut">No match</td></tr>`;
+};
+document.addEventListener("click", async e => {
+  const b = e.target.closest("button"); if (!b) return;
+  try {
+    if (b.dataset.feed) { await CyberHub.setFeedEnabled(+b.dataset.feed, b.dataset.on === "1"); loadFeeds(); loadStatus(); }
+    if (b.dataset.evblock) { await CyberHub.blockFromAlert(+b.dataset.evblock); toast("Blocked in the firewall (Part 9)"); loadEvents(); }
+    if (b.dataset.act) {
+      const a = $("#rActions")._acts[+b.dataset.act], r = $("#rActions")._r;
+      if (a.action === "block_ip") { await CyberHub.blockAddress(a.ip); toast("Blocked in the firewall (Part 9)"); }
+      if (a.action === "add_blocklist") { await CyberHub.addToBlocklist({ values: [r.indicator.value] }); toast("Added to your block list"); loadBlock(); }
+      if (a.action === "allow") { await CyberHub.allowIndicator(r.indicator.value, "marked safe"); toast("Allowed (admin)"); }
+      if (a.action === "deep_check") { $("#deep").checked = true; check(); }
+      if (a.action === "hunt") $("#btnHunt").click();
+    }
+  } catch (err) { toast(err.message, true); }
+});
+
+(async () => {
+  try { await CyberHub.me(); } catch (e) { $("#gate").style.display = "block"; return; }
+  $("#app").style.display = "grid";
+  loadAll();
+  CyberHub.streamIntel(d => { if (d.events.length) { loadEvents(); loadStatus(); d.events.forEach(ev => toast(ev.title, ev.severity === "critical" || ev.severity === "high")); } });
+})();
+</script>
+</body>
+</html>

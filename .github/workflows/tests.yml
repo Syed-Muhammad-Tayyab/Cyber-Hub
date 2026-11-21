@@ -1,0 +1,61 @@
+# Cyber Hub - continuous integration
+# Developed by Syed Muhammad Tayyab
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} · Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install yara-python || echo "yara-python unavailable - the built-in YARA-lite engine is tested"
+      - name: Run the test suite
+        env:
+          CYBERHUB_TOAST_BACKEND: memory
+          CYBERHUB_DESKTOP_BACKEND: memory
+        run: python -m pytest -q
+
+  build-exe:
+    name: Build CyberHub.exe
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-desktop.txt
+      - name: Build
+        run: pyinstaller --noconfirm --clean packaging/CyberHub.spec
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CyberHub-windows
+          path: dist/CyberHub
+          retention-days: 14

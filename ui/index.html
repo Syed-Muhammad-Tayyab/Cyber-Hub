@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>Cyber Hub</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="author" content="Syed Muhammad Tayyab">
+<meta name="description" content="Cyber Hub - security center for your Windows PC and online accounts. Developed by Syed Muhammad Tayyab.">
+<link rel="icon" href="assets/icon.png">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<!-- Cyber Hub - Developed by Syed Muhammad Tayyab -->
+<div id="boot" class="boot"><div class="boot-logo"></div><div class="boot-text">Starting Cyber Hub…</div></div>
+<div id="auth" class="auth" hidden></div>
+<div id="shell" class="shell" hidden>
+  <aside id="side" class="side">
+    <div class="brand">
+      <button id="burger" class="icon-btn" title="Open / close the menu" aria-label="Menu"></button>
+      <div class="brand-name"><span class="brand-mark"></span><b>Cyber Hub</b></div>
+    </div>
+    <nav id="nav" class="nav"></nav>
+    <div class="side-foot">
+      <div class="credit">Developed by<br><b>Syed Muhammad Tayyab</b></div>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <div class="top-left">
+        <h1 id="page-title">Dashboard</h1>
+        <span id="page-sub" class="muted"></span>
+      </div>
+      <div class="top-right">
+        <span class="credit-top">Developed by Syed Muhammad Tayyab</span>
+        <button id="btn-refresh" class="icon-btn" title="Refresh this page"></button>
+        <button id="btn-bell" class="icon-btn bell" title="Notifications"><span id="bell-count" class="count" hidden>0</span></button>
+        <button id="btn-lock" class="icon-btn" title="Lock Cyber Hub"></button>
+        <button id="btn-user" class="user-chip" title="Your account"><span id="user-initial" class="avatar">S</span><span id="user-name"></span></button>
+      </div>
+    </header>
+    <main id="view" class="view"></main>
+    <footer class="foot">Cyber Hub <span id="foot-version"></span> · Developed by Syed Muhammad Tayyab</footer>
+  </div>
+</div>
+<div id="modal-root"></div>
+<div id="toast-root" class="toasts"></div>
+<script src="assets/core.js"></script>
+<script src="assets/pages-protect.js"></script>
+<script src="assets/pages-network.js"></script>
+<script src="assets/pages-privacy.js"></script>
+<script src="assets/pages-tools.js"></script>
+<script src="assets/pages-manage.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

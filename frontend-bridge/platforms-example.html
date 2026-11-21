@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<!-- Cyber Hub - Social & Platform Accounts example (Part 16) | Developed by Syed Muhammad Tayyab
+     Copy this file + cyberhub-api.js (+ auth-example.html) into ../ui/, start the engine, sign in at
+     /auth-example.html, then open http://127.0.0.1:8765/platforms-example.html
+     Account handles, breach texts and extension names come from users / the internet: everything is escaped. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cyber Hub · Platforms & accounts</title>
+<style>
+  :root{--bg:#0b1220;--card:rgba(30,58,138,.22);--line:rgba(96,165,250,.22);--txt:#e2e8f0;--mut:#94a3b8;--acc:#3b82f6}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 "Segoe UI",system-ui,sans-serif}
+  header,footer{padding:12px 24px;color:#93c5fd;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+  footer{color:var(--mut);justify-content:center} a{color:#93c5fd}
+  h1{margin:0;font-size:20px;color:var(--txt)} h2{margin:0 0 12px;font-size:14px;color:#bfdbfe;font-weight:600}
+  main{padding:0 24px 12px;display:grid;gap:16px;grid-template-columns:repeat(12,1fr)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;backdrop-filter:blur(10px)}
+  .s12{grid-column:span 12}.s8{grid-column:span 8}.s6{grid-column:span 6}.s4{grid-column:span 4}
+  @media(max-width:1100px){.s8,.s6,.s4{grid-column:span 12}}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  button,input,select{font:inherit;color:var(--txt);background:#0f172a;border:1px solid #334155;border-radius:8px;padding:5px 10px}
+  button{cursor:pointer;background:#1e3a8a;border-color:#1e40af} button.ghost{background:transparent;border-color:#334155}
+  .wide{flex:1;min-width:200px}
+  table{width:100%;border-collapse:collapse;font-size:13px} td,th{padding:6px 4px;text-align:left;border-bottom:1px solid #1e293b;vertical-align:top}
+  th{color:var(--mut);font-weight:500} tr.sel{background:rgba(59,130,246,.12)} tr.click{cursor:pointer}
+  .pill{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap}
+  .done,.clean,.none{background:#14532d;color:#86efac}.critical,.high,.malicious,.not_done{background:#7f1d1d;color:#fca5a5}
+  .medium,.suspicious{background:#78350f;color:#fcd34d}.low,.low_risk{background:#1e3a5f;color:#93c5fd}
+  .unknown,.info,.not_applicable,.none_offered{background:#334155;color:#cbd5e1}
+  .mut{color:var(--mut)} .ring{width:120px;height:120px;flex:none}
+  .bars div{display:flex;align-items:center;gap:8px;font-size:12px;margin:3px 0} .bars i{display:block;height:8px;background:var(--acc);border-radius:9px}
+  .scroll{max-height:420px;overflow:auto} #gate{text-align:center;padding:60px} ul{margin:6px 0;padding-left:18px}
+  #toast{position:fixed;right:20px;bottom:20px;background:#1e3a8a;border:1px solid #3b82f6;padding:12px 16px;border-radius:12px;display:none;max-width:480px;z-index:6}
+  #toast.bad{background:#450a0a;border-color:#ef4444}
+</style>
+</head>
+<body>
+<header><h1>🔐 Cyber Hub · Platforms &amp; accounts</h1>
+  <span>Developed by Syed Muhammad Tayyab · <a href="passwords-example.html">Passwords</a> · <a href="intel-example.html">Threat intel</a></span></header>
+<div id="gate" style="display:none">Sign in first at <a href="auth-example.html">auth-example.html</a>, then come back.</div>
+
+<main id="app" style="display:none">
+  <section class="card s4">
+    <h2>Account protection</h2>
+    <div class="row"><svg class="ring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#1e293b" stroke-width="3"/>
+      <circle id="ringArc" cx="18" cy="18" r="15.9" fill="none" stroke="#22c55e" stroke-width="3" stroke-dasharray="0 100" transform="rotate(-90 18 18)" stroke-linecap="round"/>
+      <text id="ringTxt" x="18" y="20" text-anchor="middle" fill="#e2e8f0" font-size="8">–</text></svg>
+      <div><div id="hGrade"></div><div id="hAcc" class="mut"></div><div id="h2fa" class="mut"></div>
+        <div id="hBreach" class="mut"></div><div id="hExt" class="mut"></div></div></div>
+    <div class="row" style="margin-top:10px"><button id="btnDiscover">Find my accounts</button>
+      <button class="ghost" id="btnCatalog">Update breach list</button></div>
+  </section>
+
+  <section class="card s8">
+    <h2>Add an account</h2>
+    <div class="row"><select id="plat" class="wide"></select>
+      <input id="handle" placeholder="user name / handle"><input id="email" placeholder="sign-in e-mail">
+      <button id="btnAdd">Add</button></div>
+    <h2 style="margin-top:16px">Is this really from …?</h2>
+    <div class="row"><input id="link" class="wide" placeholder="link or sender e-mail from the message">
+      <select id="linkPlat"><option value="">(any platform)</option></select><button id="btnLink">Check</button></div>
+    <div id="linkOut" class="mut" style="margin-top:8px"></div>
+  </section>
+
+  <section class="card s6">
+    <h2>Your accounts (worst first)</h2>
+    <div class="scroll"><table><thead><tr><th>Account</th><th>2FA</th><th>Score</th><th>Top issue</th></tr></thead>
+      <tbody id="accts"></tbody></table></div>
+  </section>
+
+  <section class="card s6">
+    <h2 id="detTitle">Checklist</h2>
+    <div id="det" class="mut">Pick an account.</div>
+  </section>
+
+  <section class="card s6">
+    <h2>E-mail breach monitor</h2>
+    <div class="row"><input id="newEmail" class="wide" placeholder="you@example.com"><button id="btnEmail">Add</button>
+      <button class="ghost" id="btnCheckEmails">Check now</button></div>
+    <div class="scroll" style="margin-top:8px"><table><tbody id="emails"></tbody></table></div>
+    <div id="attr" class="mut" style="font-size:11px;margin-top:6px"></div>
+  </section>
+
+  <section class="card s6">
+    <h2>Who can reset whom</h2>
+    <div id="graph" class="bars"></div>
+    <h2 style="margin-top:14px">Risky extensions</h2>
+    <div class="scroll" style="max-height:220px"><table><tbody id="exts"></tbody></table></div>
+  </section>
+
+  <section class="card s12">
+    <h2>Alerts</h2>
+    <div class="scroll" style="max-height:240px"><table><tbody id="events"></tbody></table></div>
+  </section>
+</main>
+<div id="toast"></div>
+<footer>Cyber Hub · Developed by Syed Muhammad Tayyab</footer>
+
+<script src="cyberhub-api.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pill = (cls, txt) => `<span class="pill ${esc(cls)}">${esc(txt ?? cls)}</span>`;
+function toast(msg, bad = false) { const t = $("#toast"); t.textContent = msg; t.className = bad ? "bad" : ""; t.style.display = "block";
+  clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 5000); }
+const run = fn => async (...a) => { try { await fn(...a); } catch (e) { toast(e.message, true); } };
+let catalog = null, current = null;
+
+async function loadStatus() {
+  const s = await CyberHub.platformsStatus(), h = s.health;
+  const sc = h.score ?? 0;
+  $("#ringArc").setAttribute("stroke-dasharray", `${sc} ${100 - sc}`);
+  $("#ringArc").setAttribute("stroke", sc >= 85 ? "#22c55e" : sc >= 50 ? "#f59e0b" : "#ef4444");
+  $("#ringTxt").textContent = h.score ?? "–";
+  $("#hGrade").textContent = h.grade;
+  $("#hAcc").textContent = `${h.accounts} accounts · ${h.critical_without_2fa} critical without 2FA`;
+  $("#h2fa").textContent = `2FA coverage: ${h.two_fa_coverage ?? "–"}%`;
+  $("#hBreach").textContent = `${h.breached_emails} breached e-mail(s) · breach list: ${s.catalog.breaches} breaches`;
+  $("#hExt").textContent = `${h.risky_extensions} high-risk extension(s)`;
+  $("#attr").innerHTML = `${esc(s.attribution.text)} · <a href="${esc(s.attribution.hibp)}" target="_blank" rel="noopener">haveibeenpwned.com</a>`;
+}
+
+async function loadAccounts() {
+  const r = await CyberHub.platformAccounts();
+  $("#accts").innerHTML = r.items.map(a => `<tr class="click ${current === a.id ? "sel" : ""}" data-id="${a.id}">
+    <td><b>${esc(a.name)}</b><div class="mut">${esc(a.handle || a.email || a.label || "")}</div></td>
+    <td>${pill(a.two_factor, a.two_factor.replace("_", " "))}</td><td>${a.score}</td>
+    <td>${a.issues[0] ? pill(a.issues[0].severity) + " " + esc(a.issues[0].text) : pill("done", "OK")}</td></tr>`).join("")
+    || `<tr><td class="mut">No accounts yet - add one or press "Find my accounts".</td></tr>`;
+  document.querySelectorAll("#accts tr[data-id]").forEach(tr => tr.onclick = run(() => showAccount(+tr.dataset.id)));
+}
+
+async function showAccount(id) {
+  current = id;
+  const { account: a } = await CyberHub.platformAccount(id);
+  $("#detTitle").textContent = `${a.name} · score ${a.score}`;
+  const sec = a.security_url ? `<a href="${esc(a.security_url)}" target="_blank" rel="noopener">Open security page</a>` : esc(a.where || "");
+  $("#det").innerHTML = `<div class="row">${sec}<button class="ghost" id="btnRev">Reviewed today</button>
+      <button class="ghost" id="btnDel">Remove</button></div>
+    <ul>${a.issues.map(i => `<li>${pill(i.severity)} ${esc(i.text)}</li>`).join("")}</ul>
+    <table>${a.checklist.map(i => `<tr><td>${esc(i.label)}${i.stale ? ' <span class="mut">(stale)</span>' : ""}
+      <div class="mut">${esc(i.help)}</div></td><td>${pill(i.status, i.status.replace("_", " "))}
+      ${i.source && i.source !== "you" ? `<div class="mut">from ${esc(i.source)}</div>` : ""}</td>
+      <td><select data-item="${esc(i.id)}"><option value="">set…</option><option>done</option><option>not_done</option>
+        <option>not_applicable</option><option>unknown</option></select></td></tr>`).join("")}</table>`;
+  $("#det").querySelectorAll("select[data-item]").forEach(sel => sel.onchange = run(async () => {
+    await CyberHub.setPlatformChecklist(id, { [sel.dataset.item]: sel.value }); await refresh(); }));
+  $("#btnRev").onclick = run(async () => { await CyberHub.markPlatformReviewed(id); await refresh(); });
+  $("#btnDel").onclick = run(async () => { await CyberHub.deletePlatformAccount(id); current = null;
+    $("#det").textContent = "Pick an account."; await refresh(); });
+  loadAccounts();
+}
+
+async function loadEmails() {
+  const r = await CyberHub.platformEmails();
+  $("#emails").innerHTML = r.items.map(e => `<tr><td><b>${esc(e.masked)}</b><div class="mut">checked ${esc(e.last_checked_at || "never")}
+      ${e.last_error ? " · " + esc(e.last_error) : ""}</div></td>
+      <td>${e.breach_count ? pill(e.worst || "low", e.breach_count + " breach(es)") : pill("done", "none found")}</td>
+      <td class="mut">${e.breaches.slice(0, 4).map(b => esc(b.title) + (b.breach_date ? " (" + esc(b.breach_date.slice(0, 4)) + ")" : "")).join(", ")}</td>
+      <td>${e.unacknowledged ? `<button class="ghost" data-ack="${e.id}">Dealt with</button>` : ""}</td></tr>`).join("")
+    || `<tr><td class="mut">No addresses yet.</td></tr>`;
+  document.querySelectorAll("[data-ack]").forEach(b => b.onclick = run(async () => {
+    await CyberHub.ackEmailBreaches(+b.dataset.ack); await refresh(); }));
+}
+
+async function loadGraph() {
+  const g = await CyberHub.platformRecoveryGraph();
+  const max = Math.max(1, ...g.hubs.map(h => h.can_reset));
+  $("#graph").innerHTML = g.hubs.map(h => `<div><span style="width:150px">${esc(h.name)}</span>
+     <i style="width:${(h.can_reset / max) * 180}px;background:${h.two_factor === "done" ? "#22c55e" : "#ef4444"}"></i>
+     ${h.can_reset} ${h.two_factor === "done" ? "" : pill("critical", "no 2FA")}</div>`).join("")
+    || `<span class="mut">Add your e-mail account and the accounts that use it.</span>`;
+  const x = await CyberHub.platformExtensions();
+  $("#exts").innerHTML = x.items.filter(i => i.level !== "none").slice(0, 15).map(i => `<tr><td><b>${esc(i.name)}</b>
+     <div class="mut">${esc(i.app_label)} · ${esc(i.findings[0]?.text || "")}</div></td><td>${pill(i.level)}</td>
+     <td><button class="ghost" data-scan="${esc(i.key)}">Scan</button></td></tr>`).join("") || `<tr><td class="mut">No risky extensions.</td></tr>`;
+  document.querySelectorAll("[data-scan]").forEach(b => b.onclick = run(async () => {
+    const r = await CyberHub.scanExtension(b.dataset.scan); toast(`Antivirus scan #${r.scan_job.id} started for ${r.extension.name}`); }));
+}
+
+async function loadEvents() {
+  const ev = await CyberHub.platformEvents({ limit: 30 });
+  $("#events").innerHTML = ev.items.map(e => `<tr><td class="mut">${esc(e.ts.slice(0, 16).replace("T", " "))}</td>
+    <td>${pill(e.severity)}</td><td><b>${esc(e.title)}</b><div class="mut">${esc(e.detail || "")}</div></td></tr>`).join("")
+    || `<tr><td class="mut">No alerts.</td></tr>`;
+}
+
+async function refresh() { await Promise.all([loadStatus(), loadAccounts(), loadEmails(), loadGraph(), loadEvents()]);
+  if (current) showAccount(current); }
+
+$("#btnAdd").onclick = run(async () => {
+  const data = {}; if ($("#handle").value) data.handle = $("#handle").value; if ($("#email").value) data.email = $("#email").value;
+  const r = await CyberHub.addPlatformAccount($("#plat").value, data);
+  $("#handle").value = $("#email").value = ""; toast(`${r.account.name} added`); current = r.account.id; await refresh(); });
+$("#btnDiscover").onclick = run(async () => {
+  const r = await CyberHub.discoverPlatforms({ create: true });
+  toast(r.vault_locked ? `Added ${r.created.length} (unlock Passwords to find more)` : `Added ${r.created.length} account(s)`); await refresh(); });
+$("#btnCatalog").onclick = run(async () => { const r = await CyberHub.refreshBreachList(); toast(`${r.breaches} breaches known`); await refresh(); });
+$("#btnEmail").onclick = run(async () => { await CyberHub.addPlatformEmail($("#newEmail").value); $("#newEmail").value = ""; await loadEmails(); });
+$("#btnCheckEmails").onclick = run(async () => {
+  const j = await CyberHub.checkPlatformEmails(); toast("Checking…");
+  const done = await CyberHub.waitPlatformJob(j.id); toast(`Checked ${done.result.checked}, ${done.result.new_breaches} new breach(es)`, done.status === "failed");
+  await refresh(); });
+$("#btnLink").onclick = run(async () => {
+  const r = await CyberHub.checkPlatformLink($("#link").value, $("#linkPlat").value || null);
+  $("#linkOut").innerHTML = `${pill(r.verdict, r.verdict.replace("_", " "))} <b>${esc(r.summary)}</b>
+    <ul>${r.reasons.slice(1, 5).map(x => `<li>${esc(x)}</li>`).join("")}</ul><div>${r.advice.map(esc).join("<br>")}</div>`; });
+
+(async () => {
+  try { await CyberHub.platformsStatus(); } catch (e) { $("#gate").style.display = "block"; return; }
+  $("#app").style.display = "grid";
+  catalog = await CyberHub.platformCatalog();
+  const opts = catalog.platforms.map(p => `<option value="${esc(p.key)}">${esc(p.name)}</option>`).join("");
+  $("#plat").innerHTML = opts; $("#linkPlat").innerHTML += opts;
+  await refresh();
+  CyberHub.streamPlatforms(d => { if (d.events.length) { loadEvents(); loadStatus(); } });
+})();
+</script>
+</body>
+</html>

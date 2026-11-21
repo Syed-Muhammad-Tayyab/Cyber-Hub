@@ -1,0 +1,7 @@
+# Cyber Hub desktop app (Part 20) - Developed by Syed Muhammad Tayyab
+# The engine (requirements.txt) plus the window, tray icon and the .exe builder.
+-r requirements.txt
+pywebview>=5.1        # the app window (Microsoft Edge WebView2 on Windows - already part of Windows 10/11)
+pystray>=0.19         # tray icon: open, quick scan, pause protection, quit
+Pillow>=10.0          # tray icon image
+pyinstaller>=6.3      # only needed to build CyberHub.exe (build_windows.bat)

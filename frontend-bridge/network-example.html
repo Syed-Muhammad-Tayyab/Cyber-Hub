@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<!-- Cyber Hub - Network monitor & Wi-Fi example (Part 10) | Developed by Syed Muhammad Tayyab
+     Copy this file + cyberhub-api.js (+ auth-example.html) into ../ui/, start the engine
+     (start_cyberhub_admin.bat to see every program's connections and to apply firewall fixes),
+     sign in at /auth-example.html, then open http://127.0.0.1:8765/network-example.html -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Cyber Hub · Network monitor & Wi-Fi</title>
+<style>
+  :root{--bg:#0b1220;--card:rgba(30,58,138,.22);--line:rgba(96,165,250,.22);--txt:#e2e8f0;--mut:#94a3b8;--acc:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--c:#38bdf8;--v:#a78bfa}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 "Segoe UI",system-ui,sans-serif}
+  header,footer{padding:12px 24px;color:#93c5fd;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+  footer{color:var(--mut);justify-content:center} a{color:#93c5fd}
+  h1{margin:0;font-size:20px;color:var(--txt)} h2{margin:0 0 12px;font-size:14px;color:#bfdbfe;font-weight:600}
+  main{padding:0 24px 12px;display:grid;gap:16px;grid-template-columns:repeat(12,1fr)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;backdrop-filter:blur(10px)}
+  .s12{grid-column:span 12}.s8{grid-column:span 8}.s7{grid-column:span 7}.s6{grid-column:span 6}.s5{grid-column:span 5}.s4{grid-column:span 4}
+  @media(max-width:1100px){.s8,.s7,.s6,.s5,.s4{grid-column:span 12}}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center} .sp{justify-content:space-between}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;flex:1}
+  .tile{background:rgba(15,23,42,.5);border:1px solid var(--line);border-radius:12px;padding:10px}
+  .tile b{display:block;font-size:22px} .tile span{color:var(--mut);font-size:12px}
+  button,input,select{font:inherit;color:var(--txt);background:#0f172a;border:1px solid #334155;border-radius:8px;padding:5px 10px}
+  button{cursor:pointer;background:#1e3a8a;border-color:#1e40af} button.danger{background:#7f1d1d;border-color:#991b1b}
+  button.ghost{background:transparent;border-color:#334155} button.sm{padding:2px 8px;font-size:12px} button:disabled{opacity:.45;cursor:not-allowed}
+  table{width:100%;border-collapse:collapse;font-size:13px} td,th{padding:6px 4px;text-align:left;border-bottom:1px solid #1e293b;vertical-align:top}
+  th{color:var(--mut);font-weight:500}
+  .pill{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap;display:inline-block}
+  .ok,.excellent,.good,.blocked,.not_needed,.online{background:#14532d;color:#86efac}
+  .high,.critical,.open,.insecure{background:#7f1d1d;color:#fca5a5}
+  .medium,.weak,.allowed,.fair{background:#78350f;color:#fcd34d}.low{background:#1e3a5f;color:#93c5fd}
+  .info,.none,.unknown,.offline,.local{background:#334155;color:#cbd5e1}.internet{background:rgba(167,139,250,.2);color:#c4b5fd}.lan{background:rgba(56,189,248,.18);color:#7dd3fc}
+  .mut{color:var(--mut)} .mono{font-family:Consolas,monospace;font-size:12px;word-break:break-all} td.nw{white-space:nowrap;word-break:normal}
+  .ring{width:132px;height:132px;flex:none}
+  .bars{display:flex;align-items:flex-end;gap:3px;height:120px} .bars .d{flex:1;display:flex;flex-direction:column-reverse;height:100%;min-width:3px;max-width:22px}
+  .bars .d i{display:block;border-radius:2px 2px 0 0} .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 10px}
+  .sig{display:inline-flex;gap:2px;align-items:flex-end;height:16px} .sig i{width:4px;background:#334155;border-radius:1px} .sig i.on{background:var(--ok)}
+  .tabs button{background:transparent;border-color:#334155} .tabs button.sel{background:#1e3a8a;border-color:#3b82f6}
+  .scroll{max-height:380px;overflow:auto} #gate{text-align:center;padding:60px}
+  .finding{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:start;padding:7px 0;border-bottom:1px solid #1e293b;font-size:13px}
+  .prog{height:8px;background:#1e293b;border-radius:99px;overflow:hidden;flex:1;min-width:120px} .prog i{display:block;height:100%;background:var(--c);transition:width .3s}
+  .dev{font-size:18px;width:26px;text-align:center}
+  #toast{position:fixed;right:20px;bottom:20px;background:#1e3a8a;border:1px solid #3b82f6;padding:12px 16px;border-radius:12px;display:none;max-width:440px;z-index:6}
+  #toast.bad{background:#450a0a;border-color:#ef4444}
+</style>
+</head>
+<body>
+<header><h1>📡 Cyber Hub · Network monitor & Wi-Fi</h1>
+  <span>Developed by Syed Muhammad Tayyab · <a href="firewall-example.html">Firewall</a> · <a href="processes-example.html">Processes</a> · <a href="monitor-example.html">Monitor</a></span></header>
+<div id="gate" style="display:none">Sign in first at <a href="auth-example.html">auth-example.html</a>, then come back.</div>
+
+<main id="app" style="display:none">
+  <section class="card s8">
+    <div class="row sp"><h2 style="margin:0">Network health</h2><span class="mut" id="backend"></span></div>
+    <div class="row" style="margin-top:10px;gap:16px;align-items:center">
+      <svg class="ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" stroke="#1e293b" stroke-width="12" fill="none"/>
+        <circle id="ring" cx="60" cy="60" r="50" stroke="#22c55e" stroke-width="12" fill="none" stroke-linecap="round"
+          stroke-dasharray="314" stroke-dashoffset="314" transform="rotate(-90 60 60)"/>
+        <text id="score" x="60" y="60" text-anchor="middle" fill="#e2e8f0" font-size="26" font-weight="700">–</text>
+        <text id="grade" x="60" y="80" text-anchor="middle" fill="#94a3b8" font-size="10"></text></svg>
+      <div class="tiles" id="tiles"></div>
+    </div>
+  </section>
+
+  <section class="card s4">
+    <div class="row sp"><h2 style="margin:0">Wi-Fi</h2><button class="ghost sm" onclick="loadWifi(true)">Refresh</button></div>
+    <div id="wifi" style="margin-top:10px" class="mut">Loading…</div>
+  </section>
+
+  <section class="card s7">
+    <div class="row sp"><h2 style="margin:0">Connections over time</h2>
+      <span class="legend mut"><i style="background:var(--c)"></i>established<i style="background:var(--v)"></i>internet hosts<i style="background:var(--bad)"></i>flagged</span></div>
+    <div class="bars" id="bars" style="margin-top:12px"></div>
+    <div class="row sp mut" style="font-size:11px;margin-top:4px"><span id="t0"></span><span id="live" class="mono"></span><span>now</span></div>
+  </section>
+
+  <section class="card s5">
+    <div class="row sp"><h2 style="margin:0">Findings</h2><button class="ghost sm" onclick="loadFindings(true)">Re-check</button></div>
+    <div id="findings" class="scroll" style="max-height:220px"></div>
+  </section>
+
+  <section class="card s12">
+    <div class="row sp">
+      <div class="tabs row"><button data-t="conn" class="sel">Connections</button><button data-t="proc">By program</button><button data-t="listen">Open ports</button></div>
+      <div class="row"><input id="q" placeholder="Search program, IP, port…" style="width:220px">
+        <select id="scope"><option value="">Any scope</option><option value="internet">Internet</option><option value="lan">Local network</option><option value="local">This PC</option></select>
+        <label class="mut"><input type="checkbox" id="flagged"> flagged only</label>
+        <label class="mut"><input type="checkbox" id="resolve"> host names</label></div>
+    </div>
+    <div id="table" class="scroll" style="margin-top:10px"></div>
+  </section>
+
+  <section class="card s8">
+    <div class="row sp"><h2 style="margin:0" id="lanTitle">Devices on your network</h2>
+      <div class="row"><label class="mut"><input type="checkbox" id="home"> Home network</label>
+        <button id="scanBtn" onclick="scan()">Scan network</button></div></div>
+    <div class="row" id="scanRow" style="display:none;margin:8px 0"><div class="prog"><i id="scanBar" style="width:0"></i></div><span class="mut" id="scanTxt"></span>
+      <button class="ghost sm" onclick="CyberHub.cancelLanScan().catch(toastErr)">Cancel</button></div>
+    <div id="routerAlert"></div>
+    <div id="lan" class="scroll" style="margin-top:8px"></div>
+  </section>
+
+  <section class="card s4">
+    <div class="row sp"><h2 style="margin:0">Alerts</h2><button class="ghost sm" onclick="CyberHub.ackNetworkEvents().then(loadEvents)">Mark all read</button></div>
+    <div id="events" class="scroll"></div>
+  </section>
+</main>
+<footer>Cyber Hub · Network monitor & Wi-Fi (Part 10) · Developed by Syed Muhammad Tayyab</footer>
+<div id="toast"></div>
+
+<script src="cyberhub-api.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pill = (cls, txt) => `<span class="pill ${esc(cls)}">${esc(txt ?? cls)}</span>`;
+function toast(msg, bad) { const t = $("#toast"); t.textContent = msg; t.className = bad ? "bad" : ""; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 4500); }
+const toastErr = e => toast(e.message || String(e), true);
+let tab = "conn", lanNet = null;
+
+const TYPE_ICON = { "router": "📶", "this computer": "💻", "Windows PC": "🖥️", "printer": "🖨️", "camera / video recorder": "📷",
+  "iPhone / iPad": "📱", "phone / laptop (private address)": "📱", "Chromecast / smart TV": "📺", "NAS storage": "🗄️",
+  "Raspberry Pi": "🍓", "virtual machine": "🧊", "smart-home hub": "🏠", "Linux / network device": "🐧" };
+
+async function loadStatus() {
+  const s = await CyberHub.networkStatus();
+  $("#backend").textContent = `${s.backend.probe} · Wi-Fi: ${s.backend.wifi} · Firewall: ${s.backend.firewall || "not available"}` +
+    (s.backend.elevated === false ? " · not elevated (some programs hidden)" : "");
+  const sc = s.score ?? 0, col = sc >= 90 ? "#22c55e" : sc >= 70 ? "#38bdf8" : sc >= 50 ? "#f59e0b" : "#ef4444";
+  $("#ring").style.strokeDashoffset = 314 - 314 * sc / 100; $("#ring").setAttribute("stroke", col);
+  $("#score").textContent = s.score ?? "–"; $("#grade").textContent = s.grade || "";
+  const c = s.connections || {}, l = s.lan || {};
+  const tiles = [["Connections", c.established ?? 0, `${c.total ?? 0} sockets`], ["Internet hosts", c.remote_hosts ?? 0, `${c.processes ?? 0} programs`],
+    ["Listening", c.listening ?? 0, "open ports"], ["Flagged", c.flagged ?? 0, "suspicious now"],
+    ["LAN devices", l.devices ?? "–", l.new_24h ? `${l.new_24h} new today` : (l.name || "no network")],
+    ["Alerts", s.unacknowledged_alerts, "unread"]];
+  $("#tiles").innerHTML = tiles.map(([k, v, sub]) => `<div class="tile"><span>${esc(k)}</span><b>${esc(v)}</b><span>${esc(sub)}</span></div>`).join("");
+  if (s.error) toast(s.error, true);
+}
+
+function signal(p) { const n = Math.ceil((p || 0) / 25); return `<span class="sig">${[1,2,3,4].map(i => `<i class="${i <= n ? "on" : ""}" style="height:${i*4}px"></i>`).join("")}</span>`; }
+
+async function loadWifi(refresh) {
+  const w = await CyberHub.wifi(!!refresh);
+  if (!w.available) { $("#wifi").innerHTML = `<span class="mut">${esc(w.error || "No Wi-Fi")}</span>`; return; }
+  const c = w.current;
+  let h = c ? `<div class="row sp"><b style="font-size:16px">${esc(c.ssid || "(hidden)")}</b>${pill(c.assessment.rating)}</div>
+      <div class="mut" style="margin:4px 0">${signal(c.signal)} ${esc(c.signal)}% · ${esc((c.auth || "").toUpperCase())} · ${esc(c.cipher)} · ${esc(c.band || "")} ch ${esc(c.channel ?? "?")}</div>
+      <div style="font-size:12px">${esc(c.assessment.text)}</div>`
+    : `<div class="mut">Not connected to Wi-Fi${w.error ? " – " + esc(w.error) : ""}</div>`;
+  h += `<h2 style="margin:12px 0 6px">Nearby (${w.nearby_count}, ${w.nearby_open} open)</h2><table>` +
+    w.nearby.slice(0, 8).map(n => `<tr><td>${esc(n.ssid || "(hidden)")}${n.connected ? " ✔" : ""}</td><td>${signal(n.signal)}</td><td>${pill(n.assessment.rating, (n.auth || "").toUpperCase())}</td></tr>`).join("") + "</table>";
+  $("#wifi").innerHTML = h;
+}
+
+async function loadFindings(refresh) {
+  const a = await CyberHub.networkFindings(!!refresh);
+  $("#findings").innerHTML = a.findings.length ? a.findings.map(f => `<div class="finding">${pill(f.severity)}
+      <div><b>${esc(f.title)}</b><div class="mut">${esc(f.detail)}</div></div>
+      ${f.fix ? `<button class="sm" onclick="fix('${esc(f.id)}')">${esc(f.fix_label || "Fix")}</button>` : "<span></span>"}</div>`).join("")
+    : `<div class="mut">Nothing to fix – your network looks clean ✔</div>`;
+}
+async function fix(id) { try { await CyberHub.fixNetworkFinding(id); toast("Done – firewall updated"); refreshAll(); } catch (e) { toastErr(e); } }
+
+async function loadGraph() {
+  const s = await CyberHub.networkSummary(6);
+  const rows = s.series.slice(-48), max = Math.max(1, ...rows.map(r => Math.max(r.established, r.remote_hosts)));
+  $("#bars").innerHTML = rows.map(r => `<div class="d" title="${esc(r.ts)}: ${r.established} established, ${r.remote_hosts} hosts, ${r.flagged} flagged">
+      <i style="height:${r.flagged / max * 100}%;background:var(--bad)"></i><i style="height:${Math.max(0, r.remote_hosts - r.flagged) / max * 100}%;background:var(--v)"></i>
+      <i style="height:${Math.max(0, r.established - r.remote_hosts) / max * 100}%;background:var(--c)"></i></div>`).join("") || `<span class="mut">Samples appear after the first background check (every few minutes)</span>`;
+  $("#t0").textContent = rows[0] ? new Date(rows[0].ts).toLocaleTimeString() : "";
+}
+
+async function loadTable() {
+  const search = $("#q").value.trim() || undefined, scope = $("#scope").value || undefined, flagged = $("#flagged").checked;
+  if (tab === "conn") {
+    const r = await CyberHub.connections({ search, scope, flagged, resolve: $("#resolve").checked, limit: 300 });
+    $("#table").innerHTML = `<table><tr><th>Program</th><th>Direction</th><th>Remote</th><th>Service</th><th>State</th><th>Risk</th><th></th></tr>` +
+      r.items.map(x => `<tr><td><b>${esc(x.process || "?")}</b> <span class="mut">${esc(x.pid ?? "")}</span><div class="mono mut">${esc(x.exe || "")}</div></td>
+        <td>${esc(x.direction)} ${pill(x.scope)}</td><td class="mono">${esc(x.remote_ip)}:${esc(x.remote_port)}${x.remote_host ? `<div class="mut">${esc(x.remote_host)}</div>` : ""}</td>
+        <td>${esc(x.service || "")}</td><td>${esc(x.status)}</td>
+        <td>${pill(x.risk_level)}${x.reasons.map(t => `<div class="mut" style="font-size:12px">${esc(t)}</div>`).join("")}</td>
+        <td>${x.scope === "internet" && !x.blocked_by ? `<button class="sm danger" onclick="blockIp('${esc(x.remote_ip)}')">Block IP</button>` : x.blocked_by ? pill("blocked") : ""}</td></tr>`).join("") + "</table>";
+  } else if (tab === "proc") {
+    const r = await CyberHub.connectionsByProcess();
+    $("#table").innerHTML = `<table><tr><th>Program</th><th>Connections</th><th>Internet hosts</th><th>Listening</th><th>Top ports</th><th>Risk</th><th></th></tr>` +
+      r.items.filter(g => !search || (g.process || "").toLowerCase().includes(search.toLowerCase())).map(g => `<tr>
+        <td><b>${esc(g.process || "?")}</b> <span class="mut">${esc(g.pid ?? "")}</span></td><td>${g.connections} (${g.established} est.)</td>
+        <td>${g.remote_hosts}</td><td class="mono">${esc(g.listening.join(", "))}</td><td class="mono">${esc(g.top_remote_ports.map(p => p[0] + "×" + p[1]).join(" "))}</td>
+        <td>${pill(g.risk_level)}${g.behaviour.map(b => `<div class="mut" style="font-size:12px">${esc(b.text)}</div>`).join("")}</td>
+        <td>${g.exe && !g.protected && !g.cyberhub ? `<button class="sm danger" onclick="blockProc(${g.pid}, ${g.create_time})">Block network</button>` : ""}</td></tr>`).join("") + "</table>";
+  } else {
+    const r = await CyberHub.listeningPorts({});
+    $("#table").innerHTML = `<div class="mut" style="margin-bottom:6px">${r.counts.total} open ports · ${r.counts.exposed} reachable from the network · ${r.counts.reachable} let in by the firewall</div>
+      <table><tr><th>Port</th><th>Program</th><th>Who can connect</th><th>Firewall</th><th>Risk</th><th></th></tr>` +
+      r.items.map(m => `<tr><td class="mono">${m.proto.toUpperCase()} ${m.port}<div class="mut">${esc(m.service || "")}</div></td>
+        <td><b>${esc(m.process || "?")}</b> <span class="mut">${esc(m.pid ?? "")}</span></td>
+        <td>${pill(m.exposure === "local" ? "local" : "lan", m.exposure === "local" ? "this PC only" : "network")}</td>
+        <td>${pill(m.firewall.verdict, m.firewall.verdict.replace("_", " "))}<div class="mut" style="font-size:12px">${esc(m.firewall.reason || "")}</div></td>
+        <td>${pill(m.severity)}</td>
+        <td>${m.exposure !== "local" && m.firewall.verdict !== "blocked" ? `<button class="sm danger" onclick="blockPort(${m.port}, '${m.proto}')">Block incoming</button>` : ""}</td></tr>`).join("") + "</table>";
+  }
+}
+async function blockIp(ip) { try { const b = await CyberHub.blockIp(ip, { reason: "Blocked from the network monitor" }); toast(`Blocked ${ip}` + (b.warnings?.length ? " – " + b.warnings[0] : "")); loadTable(); } catch (e) { toastErr(e); } }
+async function blockProc(pid, ct) { try { await CyberHub.blockProcess(pid, { create_time: ct, reason: "Blocked from the network monitor" }); toast("Program blocked"); loadTable(); } catch (e) { toastErr(e); } }
+async function blockPort(p, proto) { try { await CyberHub.blockPort(p, { protocol: proto, direction: "in", reason: "Blocked from the network monitor" }); toast(`Incoming ${proto.toUpperCase()} ${p} blocked`); loadTable(); } catch (e) { toastErr(e); } }
+
+async function loadLan() {
+  const r = await CyberHub.lan();
+  lanNet = r.network;
+  if (!lanNet) { $("#lan").innerHTML = `<div class="mut">Not connected to a network</div>`; $("#scanBtn").disabled = true; return; }
+  $("#lanTitle").textContent = `Devices on ${lanNet.name} (${lanNet.subnet})`;
+  $("#home").checked = lanNet.home; $("#scanBtn").disabled = !lanNet.scannable;
+  $("#routerAlert").innerHTML = lanNet.gateway_alert_mac ? `<div class="finding">${pill("high")}<div><b>Router address changed</b>
+      <div class="mut">${esc(lanNet.gateway_ip)} was ${esc(lanNet.gateway_mac)}, now ${esc(lanNet.gateway_alert_mac)} – possible ARP spoofing</div></div>
+      <button class="sm" onclick="CyberHub.acceptNewRouter(${lanNet.id}).then(loadLan).catch(toastErr)">It's my new router</button></div>` : "";
+  $("#lan").innerHTML = `<table><tr><th></th><th>Device</th><th>IP</th><th>MAC / vendor</th><th>Open ports</th><th>Status</th><th></th></tr>` +
+    r.devices.map(d => `<tr><td class="dev">${TYPE_ICON[d.device_type] || "❔"}</td>
+      <td><b>${esc(d.label || d.nb_name || d.hostname || d.vendor || "Unknown device")}</b><div class="mut">${esc(d.device_type)}${d.is_gateway ? " · gateway" : ""}</div>
+        ${d.flags.map(f => `<div style="font-size:12px">${pill(f.severity)} ${esc(f.text)}</div>`).join("")}</td>
+      <td class="mono nw">${esc(d.ip)}</td><td class="mono nw">${esc(d.mac || "")}<div class="mut">${esc(d.vendor || "")}</div></td>
+      <td class="mono">${esc((d.open_ports || []).join(", ") || (d.open_ports ? "none" : "not scanned"))}</td>
+      <td>${pill(d.online ? "online" : "offline")} ${d.trusted ? pill("ok", "trusted") : ""}</td>
+      <td>${d.id ? `<button class="ghost sm" onclick="rename(${d.id})">Rename</button>${d.trusted ? "" : ` <button class="ghost sm" onclick="trust(${d.id})">Trust</button>`}` : ""}</td></tr>`).join("") + "</table>";
+  showScan(r.scan);
+}
+function showScan(s) {
+  const run = s && s.state === "running";
+  $("#scanRow").style.display = run ? "flex" : "none"; $("#scanBtn").disabled = run || !lanNet?.scannable;
+  if (run) { $("#scanBar").style.width = s.percent + "%"; $("#scanTxt").textContent = `${s.phase} · ${s.found} found of ${s.hosts} addresses`; }
+}
+async function scan() {
+  try { showScan(await CyberHub.startLanScan(true)); } catch (e) { return toastErr(e); }
+  const t = setInterval(async () => { const s = await CyberHub.lanScanStatus(); showScan(s);
+    if (s.state !== "running") { clearInterval(t); toast(s.state === "done" ? `Found ${s.found} devices (${s.new} new)` : `Scan ${s.state}`, s.state === "failed"); loadLan(); loadFindings(true).then(loadStatus); } }, 700);
+}
+async function rename(id) { const n = prompt("Name for this device"); if (n != null) CyberHub.updateLanDevice(id, { label: n }).then(loadLan).catch(toastErr); }
+async function trust(id) { CyberHub.updateLanDevice(id, { trusted: true }).then(loadLan).catch(toastErr); }
+$("#home").onchange = e => lanNet && CyberHub.setHomeNetwork(lanNet.id, e.target.checked).then(loadLan).catch(err => { e.target.checked = !e.target.checked; toastErr(err); });
+
+async function loadEvents() {
+  const ev = await CyberHub.networkEvents({ limit: 40 });
+  $("#events").innerHTML = ev.items.map(e => `<div class="finding">${pill(e.severity)}<div><b>${esc(e.title)}</b>
+      <div class="mut" style="font-size:12px">${esc(e.detail || "")}</div><div class="mut" style="font-size:11px">${new Date(e.ts).toLocaleString()}</div></div>
+      <span>${e.acknowledged ? "" : "●"}</span></div>`).join("") || `<div class="mut">No alerts yet</div>`;
+}
+
+function refreshAll() { return Promise.all([loadStatus(), loadFindings(), loadTable(), loadLan(), loadEvents()]).catch(toastErr); }
+
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".tabs button").forEach(x => x.classList.remove("sel")); b.classList.add("sel"); tab = b.dataset.t; loadTable().catch(toastErr); });
+["#q", "#scope", "#flagged", "#resolve"].forEach(s => $(s).addEventListener(s === "#q" ? "input" : "change", () => loadTable().catch(toastErr)));
+
+(async () => {
+  try { await CyberHub.networkStatus(); } catch (e) { if (e.status === 401 || e.status === 423) { $("#gate").style.display = "block"; return; } }
+  $("#app").style.display = "grid";
+  await refreshAll(); loadWifi(); loadGraph();
+  CyberHub.streamNetwork(d => {
+    const l = d.live; $("#live").textContent = `live: ${l.established} established · ${l.remote_hosts} internet hosts · ${l.flagged} flagged`;
+    if (d.events.length) { d.events.forEach(e => SEVERITY_TOAST.includes(e.severity) && toast(e.title, true)); loadEvents(); loadStatus(); }
+    showScan(d.scan);
+  });
+  setInterval(() => { loadStatus(); loadGraph(); }, 60000);
+})();
+const SEVERITY_TOAST = ["medium", "high", "critical"];
+</script>
+</body>
+</html>

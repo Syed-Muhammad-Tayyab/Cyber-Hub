@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<!-- Cyber Hub - Account flow example (Part 2) | Developed by Syed Muhammad Tayyab
+     Copy this file + cyberhub-api.js into ../ui/ and open http://127.0.0.1:8765/auth-example.html
+     Shows how your real UI should call setup / login / lock / unlock. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cyber Hub · Sign in</title>
+<style>
+  body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b1220;color:#e2e8f0;font:15px/1.5 "Segoe UI",system-ui,sans-serif}
+  .card{width:340px;padding:28px;border-radius:18px;background:rgba(30,58,138,.25);border:1px solid rgba(96,165,250,.25);backdrop-filter:blur(12px)}
+  header{font-size:12px;color:#93c5fd;margin-bottom:6px} h1{margin:0 0 18px;font-size:22px}
+  input,button{width:100%;box-sizing:border-box;padding:10px 12px;margin:6px 0;border-radius:10px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font:inherit}
+  button{background:#3b82f6;border:0;cursor:pointer;font-weight:600} button.alt{background:#1e293b}
+  .meter{height:6px;border-radius:3px;background:#1e293b;overflow:hidden} .meter i{display:block;height:100%;width:0;transition:.3s}
+  .msg{min-height:20px;font-size:13px;color:#fca5a5} .ok{color:#86efac} .hide{display:none} small{color:#94a3b8}
+</style>
+</head>
+<body>
+<div class="card">
+  <header>Developed by Syed Muhammad Tayyab</header>
+  <h1 id="title">Cyber Hub</h1>
+
+  <form id="auth" class="hide">
+    <input id="user" placeholder="Username" autocomplete="username" required>
+    <input id="name" placeholder="Display name" class="hide">
+    <input id="pass" type="password" placeholder="Password" autocomplete="current-password" required>
+    <div class="meter hide" id="meter"><i></i></div><small id="hint"></small>
+    <button id="go">Continue</button>
+  </form>
+
+  <div id="home" class="hide">
+    <p>Signed in as <b id="who"></b></p>
+    <button id="lockBtn" class="alt">Lock</button>
+    <button id="outBtn" class="alt">Sign out</button>
+  </div>
+
+  <form id="lockForm" class="hide">
+    <p>🔒 Session locked</p>
+    <input id="unlockPass" type="password" placeholder="PIN or password" required>
+    <button>Unlock</button>
+  </form>
+  <p class="msg" id="msg"></p>
+</div>
+
+<script src="cyberhub-api.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const show = (...ids) => ["auth", "home", "lockForm"].forEach(i => $(i).classList.toggle("hide", !ids.includes(i)));
+const say = (t, ok) => { $("msg").textContent = t || ""; $("msg").className = "msg" + (ok ? " ok" : ""); };
+let setupMode = false;
+
+async function start() {
+  if (!(await CyberHub.isOnline())) return say("Cyber Hub engine is not running.");
+  if (CyberHub.isSignedIn()) {
+    try { const m = await CyberHub.me(); return m.session.is_locked ? show("lockForm") : home(m.user); } catch (e) {}
+  }
+  setupMode = (await CyberHub.accountStatus()).setup_required;
+  $("title").textContent = setupMode ? "Create your account" : "Sign in";
+  $("name").classList.toggle("hide", !setupMode);
+  $("meter").classList.toggle("hide", !setupMode);
+  show("auth");
+}
+function home(u) { $("who").textContent = u.display_name; show("home"); say("Welcome back!", true); }
+
+$("pass").addEventListener("input", async () => {
+  if (!setupMode) return;
+  const s = await CyberHub.passwordStrength($("pass").value, $("user").value);
+  const bar = $("meter").firstElementChild;
+  bar.style.width = (s.score + 1) * 20 + "%";
+  bar.style.background = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#10b981"][s.score];
+  $("hint").textContent = s.label + (s.feedback[0] ? " - " + s.feedback[0] : "");
+});
+$("auth").onsubmit = async e => {
+  e.preventDefault(); say("");
+  try {
+    const j = setupMode
+      ? await CyberHub.setup($("user").value, $("pass").value, $("name").value)
+      : await CyberHub.login($("user").value, $("pass").value);
+    home(j.user);
+  } catch (err) { say(err.message); }
+};
+$("lockBtn").onclick = async () => { await CyberHub.lock(); show("lockForm"); say(""); };
+$("outBtn").onclick = async () => { await CyberHub.logout(); start(); };
+$("lockForm").onsubmit = async e => {
+  e.preventDefault();
+  const v = $("unlockPass").value;
+  try { /^\d{4,8}$/.test(v) ? await CyberHub.unlockWithPin(v) : await CyberHub.unlockWithPassword(v);
+        $("unlockPass").value = ""; home((await CyberHub.me()).user);
+  } catch (err) { say(err.message); }
+};
+window.addEventListener("cyberhub:locked", () => show("lockForm"));
+window.addEventListener("cyberhub:signedout", start);
+start();
+</script>
+</body>
+</html>

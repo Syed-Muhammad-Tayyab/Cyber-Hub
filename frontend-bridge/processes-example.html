@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<!-- Cyber Hub - Processes & Startup example (Part 4) | Developed by Syed Muhammad Tayyab
+     Copy this file + cyberhub-api.js (+ auth-example.html) into ../ui/, start the engine,
+     sign in at /auth-example.html, then open http://127.0.0.1:8765/processes-example.html -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cyber Hub · Processes & Startup</title>
+<style>
+  :root{--bg:#0b1220;--card:rgba(30,58,138,.22);--line:rgba(96,165,250,.22);--txt:#e2e8f0;--mut:#94a3b8;--acc:#3b82f6}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 "Segoe UI",system-ui,sans-serif}
+  header,footer{padding:12px 24px;color:#93c5fd;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+  footer{color:var(--mut);justify-content:center}
+  h1{margin:0;font-size:20px;color:var(--txt)} h2{margin:0 0 12px;font-size:14px;color:#bfdbfe;font-weight:600}
+  main{padding:0 24px 12px;display:grid;gap:16px;grid-template-columns:repeat(12,1fr)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;backdrop-filter:blur(10px)}
+  .s12{grid-column:span 12}.s8{grid-column:span 8}.s4{grid-column:span 4}.s3{grid-column:span 3}
+  @media(max-width:1000px){.s8,.s4,.s3{grid-column:span 12}}
+  .stat b{display:block;font-size:26px} .stat span{color:var(--mut);font-size:12px}
+  .tabs{display:flex;gap:8px;margin-bottom:12px} .tabs button.on{background:var(--acc)}
+  table{width:100%;border-collapse:collapse;font-size:13px} td,th{padding:6px 4px;text-align:left;border-bottom:1px solid #1e293b;vertical-align:top}
+  th{color:var(--mut);font-weight:500} tr.sel{background:rgba(59,130,246,.15)} tbody tr{cursor:pointer}
+  .pill{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap}
+  .none{background:#14532d;color:#86efac}.low{background:#1e3a8a;color:#bfdbfe}.medium{background:#78350f;color:#fcd34d}.high{background:#7f1d1d;color:#fca5a5}
+  .new{background:#581c87;color:#e9d5ff}
+  button,input,select{font:inherit;color:var(--txt);background:#0f172a;border:1px solid #334155;border-radius:8px;padding:5px 10px}
+  button{cursor:pointer;background:#1e3a8a;border-color:#1e40af} button.danger{background:#7f1d1d;border-color:#991b1b}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  .mut{color:var(--mut)} .mono{font-family:Consolas,monospace;font-size:12px;word-break:break-all}
+  .kv{display:grid;grid-template-columns:110px 1fr;gap:4px 10px} .kv span{color:var(--mut)}
+  .switch{width:38px;height:20px;border-radius:99px;background:#334155;position:relative;display:inline-block;cursor:pointer}
+  .switch.on{background:#22c55e} .switch i{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s}
+  .switch.on i{left:20px} .switch.off-limits{opacity:.35;cursor:not-allowed}
+  #gate{text-align:center;padding:60px} .scroll{max-height:540px;overflow:auto}
+</style>
+</head>
+<body>
+<header><h1>🛡️ Cyber Hub · Processes & Startup</h1><span>Developed by Syed Muhammad Tayyab · <span id="elev" class="mut"></span></span></header>
+<div id="gate" style="display:none">Sign in first at <a href="auth-example.html" style="color:#93c5fd">auth-example.html</a>, then come back.</div>
+
+<main id="app" style="display:none">
+  <section class="card s3 stat"><b id="stProcs">–</b><span>processes · <span id="stThreads">–</span> threads</span></section>
+  <section class="card s3 stat"><b id="stFlagged">–</b><span>processes with risk flags</span></section>
+  <section class="card s3 stat"><b id="stStartup">–</b><span>startup programs enabled</span></section>
+  <section class="card s3 stat"><b id="stNew">–</b><span>new startup items · <button id="acceptAll" style="padding:1px 8px">Review all</button></span></section>
+
+  <section class="card s12">
+    <div class="tabs"><button id="tabP" class="on">Processes</button><button id="tabS">Startup</button>
+      <span style="flex:1"></span>
+      <input id="q" placeholder="Search name, path, PID…" style="width:240px">
+      <label class="mut"><input type="checkbox" id="flagged" style="width:auto"> flagged only</label>
+      <button id="refresh">Refresh</button></div>
+
+    <div id="paneP" style="display:grid;grid-template-columns:2fr 1fr;gap:16px">
+      <div class="scroll"><table><thead><tr><th>Name</th><th>PID</th><th>CPU %</th><th>Memory</th><th>User</th><th>Risk</th></tr></thead>
+        <tbody id="procRows"></tbody></table></div>
+      <div id="details" class="mut">Select a process to see details.</div>
+    </div>
+
+    <div id="paneS" style="display:none" class="scroll">
+      <table><thead><tr><th>On</th><th>Name</th><th>Source</th><th>Publisher</th><th>Command</th><th>Risk</th><th></th></tr></thead>
+        <tbody id="startRows"></tbody></table>
+    </div>
+  </section>
+</main>
+<footer>Cyber Hub v0.4.0 · Part 4 of 20 · Developed by Syed Muhammad Tayyab</footer>
+
+<script src="cyberhub-api.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+// Process names and command lines come from the PC - always escape before inserting HTML.
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const risk = r => `<span class="pill ${r.risk_level}" title="${esc((r.reasons || []).join("\n"))}">${r.risk_level === "none" ? "OK" : esc(r.risk_level)}</span>`;
+let tab = "P", selected = null, rows = [];
+
+async function loadStats() {
+  const [p, s] = await Promise.all([CyberHub.processSummary(), CyberHub.startupSummary()]);
+  $("stProcs").textContent = p.processes; $("stThreads").textContent = p.threads;
+  $("stFlagged").textContent = p.flagged; $("stStartup").textContent = s.startup_programs_enabled;
+  $("stNew").textContent = s.new;
+  $("elev").textContent = p.engine_elevated ? "running as administrator" : "not elevated - some actions need admin";
+}
+
+async function loadProcesses() {
+  const j = await CyberHub.processes({ search: $("q").value || undefined, flaggedOnly: $("flagged").checked, limit: 300 });
+  rows = j.items;
+  $("procRows").innerHTML = rows.map(r => `<tr data-pid="${r.pid}" class="${r.pid === selected ? "sel" : ""}">
+    <td>${esc(r.name)}${r.status === "stopped" ? ' <span class="pill medium">suspended</span>' : ""}</td><td>${r.pid}</td>
+    <td>${r.cpu_percent}</td><td>${r.memory_mb} MB</td><td class="mut">${esc((r.user || "").split("\\").pop())}</td><td>${risk(r)}</td></tr>`).join("");
+}
+
+async function showDetails(pid) {
+  selected = pid;
+  const row = rows.find(r => r.pid === pid);
+  let d;
+  try { d = await CyberHub.processDetails(pid); } catch (e) { $("details").textContent = e.message; return; }
+  const ct = row ? row.create_time : d.create_time, dis = d.protected ? "disabled" : "";
+  const sig = d.signature ? `${esc(d.signature.status)}${d.signature.publisher ? " · " + esc(d.signature.publisher) : ""}` : "–";
+  $("details").innerHTML = `<h2>${esc(d.name)} <span class="mut">PID ${d.pid}</span> ${risk(d)}</h2>
+    ${d.protected ? `<p class="pill high">🔒 ${esc(d.protected_reason)}</p>` : ""}
+    <div class="kv"><span>Path</span><div class="mono">${esc(d.exe || "–")}</div>
+      <span>Command</span><div class="mono">${esc(d.cmdline || "–")}</div>
+      <span>Signature</span><div>${sig}</div>
+      <span>Parent</span><div>${d.parent ? esc(d.parent.name) + " (" + d.parent.pid + ")" : "–"}</div>
+      <span>Children</span><div>${d.children.length}</div>
+      <span>Memory</span><div>${d.memory ? d.memory.rss_mb + " MB" : "–"}</div>
+      <span>Threads</span><div>${d.threads ?? "–"} · handles ${d.handles ?? "–"}</div>
+      <span>Connections</span><div>${d.connections.length}</div>
+      <span>Priority</span><div><select id="prio" ${dis}>${["idle","below_normal","normal","above_normal","high"]
+        .map(p => `<option ${p === d.priority ? "selected" : ""}>${p}</option>`).join("")}</select></div>
+      <span>Started</span><div>${d.started_at ? new Date(d.started_at).toLocaleString() : "–"}</div></div>
+    ${(d.reasons || []).length ? `<p class="mut">⚠ ${d.reasons.map(esc).join("<br>⚠ ")}</p>` : ""}
+    <p style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="danger" ${dis} onclick="act('end', ${pid}, ${ct})">End task</button>
+      <button class="danger" ${dis} onclick="act('tree', ${pid}, ${ct})">End tree</button>
+      <button ${dis} onclick="act('${d.status === "stopped" ? "resume" : "suspend"}', ${pid}, ${ct})">${d.status === "stopped" ? "Resume" : "Suspend"}</button></p>`;
+  if ($("prio")) $("prio").onchange = e => act("priority", pid, ct, e.target.value);
+  document.querySelectorAll("#procRows tr").forEach(tr => tr.classList.toggle("sel", +tr.dataset.pid === pid));
+}
+
+async function act(kind, pid, ct, value) {
+  try {
+    if (kind === "end" || kind === "tree") {
+      if (!confirm(`End ${kind === "tree" ? "this process and all its children" : "this process"}? Unsaved work will be lost.`)) return;
+      let r = await CyberHub.endProcess(pid, { ct, tree: kind === "tree" });
+      if (r.result === "still_running" && confirm("The program did not close. Force kill it?"))
+        r = await CyberHub.endProcess(pid, { ct, tree: kind === "tree", force: true });
+      selected = null; $("details").textContent = `${r.name}: ${r.result.replace("_", " ")}`;
+    } else if (kind === "suspend") await CyberHub.suspendProcess(pid, ct);
+    else if (kind === "resume") await CyberHub.resumeProcess(pid, ct);
+    else if (kind === "priority") await CyberHub.setProcessPriority(pid, value, ct);
+    await loadProcesses(); if (selected) showDetails(selected); loadStats();
+  } catch (e) { alert(e.message); }
+}
+
+async function loadStartup(refresh = false) {
+  const j = await CyberHub.startupItems({ search: $("q").value || undefined, flaggedOnly: $("flagged").checked, refresh });
+  $("startRows").innerHTML = j.items.map(i => `<tr>
+    <td><span class="switch ${i.enabled ? "on" : ""} ${i.can_toggle ? "" : "off-limits"}" title="${esc(i.protected_reason || "")}"
+      onclick="${i.can_toggle ? `toggle('${i.id}', ${!i.enabled})` : ""}"><i></i></span></td>
+    <td>${esc(i.name)} ${i.is_new ? `<span class="pill new" onclick="CyberHub.acceptStartup('${i.id}').then(()=>{loadStartup();loadStats()})" title="Click to mark reviewed">NEW</span>` : ""}</td>
+    <td class="mut">${esc(i.source_label)}<br>${esc(i.scope)}</td><td>${esc(i.publisher || "–")}</td>
+    <td class="mono" style="max-width:420px">${esc(i.command || i.location)}</td><td>${risk(i)}</td>
+    <td class="mut">${i.requires_admin ? "admin" : ""}</td></tr>`).join("");
+}
+
+async function toggle(id, enable) {
+  try { await (enable ? CyberHub.enableStartup(id) : CyberHub.disableStartup(id)); await loadStartup(); loadStats(); }
+  catch (e) { alert(e.message); }
+}
+
+function setTab(t) {
+  tab = t; $("tabP").classList.toggle("on", t === "P"); $("tabS").classList.toggle("on", t === "S");
+  $("paneP").style.display = t === "P" ? "grid" : "none"; $("paneS").style.display = t === "S" ? "block" : "none";
+  t === "P" ? loadProcesses() : loadStartup();
+}
+
+$("tabP").onclick = () => setTab("P"); $("tabS").onclick = () => setTab("S");
+$("refresh").onclick = () => { tab === "P" ? loadProcesses() : loadStartup(true); loadStats(); };
+let qT; $("q").oninput = () => { clearTimeout(qT); qT = setTimeout(() => tab === "P" ? loadProcesses() : loadStartup(), 300); };
+$("flagged").onchange = () => tab === "P" ? loadProcesses() : loadStartup();
+$("procRows").onclick = e => { const tr = e.target.closest("tr"); if (tr) showDetails(+tr.dataset.pid); };
+$("acceptAll").onclick = () => CyberHub.acceptAllStartup().then(() => { loadStats(); if (tab === "S") loadStartup(); }).catch(e => alert(e.message));
+window.addEventListener("cyberhub:locked", () => location.href = "auth-example.html");
+window.addEventListener("cyberhub:signedout", () => location.href = "auth-example.html");
+
+(async () => {
+  if (!CyberHub.isSignedIn()) { $("gate").style.display = "block"; return; }
+  $("app").style.display = "grid";
+  await Promise.all([loadStats(), loadProcesses()]);
+  setInterval(() => { if (tab === "P") loadProcesses(); }, 5000);
+})();
+</script>
+</body>
+</html>
